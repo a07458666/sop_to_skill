@@ -136,7 +136,7 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
     status = "通過" if not findings else "需要修訂"
     report = "# SOP 品質報告\n\n"
     report += f"- **狀態**: `{status}`\n"
-    report += f"- **規則來源**: `sop_rule.md`\n"
+    report += "- **規則來源**: `sop_rule.md`\n"
     report += f"- **SOP 名稱**: {flow_data.sop_name}\n"
     report += f"- **解析出的狀態數**: {len(flow_data.states)}\n\n"
 
