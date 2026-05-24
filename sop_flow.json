@@ -1,0 +1,95 @@
+{
+  "sop_name": "SOP: Customer Order Refund Procedure",
+  "start_state": "verify_customer",
+  "states": [
+    {
+      "id": "verify_customer",
+      "type": "action",
+      "description": "Look up the customer in the CRM system using the provided customer ID.",
+      "tool": "crm_lookup_customer",
+      "parameters": [
+        "customer_id"
+      ],
+      "next_states": {
+        "customer exists": "verify_order_status",
+        "customer does not exist": "escalate_to_support"
+      }
+    },
+    {
+      "id": "verify_order_status",
+      "type": "action",
+      "description": "Check the order history to verify if the order has been delivered and if the refund request is within the 30-day return policy window.",
+      "tool": "order_lookup",
+      "parameters": [
+        "order_id"
+      ],
+      "next_states": {
+        "order is delivered and order_date is within 30 days": "evaluate_refund_amount",
+        "order is not delivered or order_date is outside 30 days": "notify_rejection"
+      }
+    },
+    {
+      "id": "evaluate_refund_amount",
+      "type": "decision",
+      "description": "Evaluate the total refund amount requested.",
+      "tool": null,
+      "parameters": null,
+      "next_states": {
+        "amount is <= $100": "execute_auto_refund",
+        "amount is > $100": "request_manager_approval"
+      }
+    },
+    {
+      "id": "execute_auto_refund",
+      "type": "action",
+      "description": "Process the refund transaction through the payment gateway.",
+      "tool": "payment_gateway_refund",
+      "parameters": [
+        "charge_id",
+        "amount"
+      ],
+      "next_states": {
+        "payment api succeeds": "notify_success",
+        "payment api fails": "escalate_to_support"
+      }
+    },
+    {
+      "id": "request_manager_approval",
+      "type": "action",
+      "description": "Pause execution and request manual approval from an operations manager.",
+      "tool": "request_manager_approval",
+      "parameters": [
+        "manager_id",
+        "amount"
+      ],
+      "next_states": {
+        "manager approves": "execute_auto_refund",
+        "manager rejects": "notify_rejection"
+      }
+    },
+    {
+      "id": "notify_success",
+      "type": "end_state",
+      "description": "End state: Send a success notification email to the customer using `send_notification_email`.",
+      "tool": "send_notification_email",
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "notify_rejection",
+      "type": "end_state",
+      "description": "End state: Send a rejection explanation email to the customer using `send_notification_email`.",
+      "tool": "send_notification_email",
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "escalate_to_support",
+      "type": "end_state",
+      "description": "End state: Create a support ticket in Zendesk using `create_zendesk_ticket` and notify human staff.",
+      "tool": "create_zendesk_ticket",
+      "parameters": null,
+      "next_states": null
+    }
+  ]
+}

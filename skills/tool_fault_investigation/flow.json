@@ -1,0 +1,139 @@
+{
+  "sop_name": "SOP: Semiconductor Tool Fault Investigation Procedure",
+  "start_state": "confirm_fault_event",
+  "states": [
+    {
+      "id": "confirm_fault_event",
+      "type": "action",
+      "description": "Review the tool alarm, operator report, MES event, and timestamp to confirm that a real equipment fault occurred.",
+      "tool": "mes_event_lookup",
+      "parameters": [
+        "tool_id",
+        "event_time"
+      ],
+      "next_states": {
+        "fault event is confirmed": "place_tool_on_hold",
+        "event is duplicate or false alarm": "document_no_fault_found"
+      }
+    },
+    {
+      "id": "place_tool_on_hold",
+      "type": "action",
+      "description": "Stop further wafer starts on the affected tool and place the tool in engineering hold while investigation is active.",
+      "tool": "tool_hold_request",
+      "parameters": [
+        "tool_id",
+        "hold_reason"
+      ],
+      "next_states": {
+        "hold is applied successfully": "check_lot_exposure",
+        "hold cannot be applied": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "check_lot_exposure",
+      "type": "decision",
+      "description": "Identify affected lots, wafers, recipes, chambers, and time windows that may have been exposed to the fault condition.",
+      "tool": "lot_history_query",
+      "parameters": [
+        "tool_id",
+        "event_time",
+        "lookback_hours"
+      ],
+      "next_states": {
+        "exposed lots are found": "review_process_data",
+        "no exposed lots are found": "run_equipment_diagnostics"
+      }
+    },
+    {
+      "id": "review_process_data",
+      "type": "action",
+      "description": "Review SPC charts, sensor traces, metrology results, and recipe parameters for excursions linked to the fault window.",
+      "tool": "process_data_review",
+      "parameters": [
+        "lot_ids",
+        "tool_id",
+        "recipe_id"
+      ],
+      "next_states": {
+        "process excursion is detected": "open_mrb_case",
+        "no process excursion is detected": "run_equipment_diagnostics"
+      }
+    },
+    {
+      "id": "run_equipment_diagnostics",
+      "type": "action",
+      "description": "Execute equipment diagnostics, review PM status, check chamber health, and inspect relevant hardware or subsystem logs.",
+      "tool": "equipment_diagnostics",
+      "parameters": [
+        "tool_id",
+        "chamber_id"
+      ],
+      "next_states": {
+        "root cause is identified": "create_corrective_action",
+        "root cause is not identified": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "create_corrective_action",
+      "type": "action",
+      "description": "Define corrective action, repair plan, verification requirement, and tool release criteria.",
+      "tool": "corrective_action_create",
+      "parameters": [
+        "tool_id",
+        "root_cause",
+        "action_owner"
+      ],
+      "next_states": {
+        "corrective action is approved": "verify_tool_recovery",
+        "corrective action is rejected": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "verify_tool_recovery",
+      "type": "action",
+      "description": "Run qualification checks, golden wafer validation, or monitor lot review before releasing the tool back to production.",
+      "tool": "tool_recovery_verify",
+      "parameters": [
+        "tool_id",
+        "qualification_plan"
+      ],
+      "next_states": {
+        "verification passes": "release_tool_to_production",
+        "verification fails": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "release_tool_to_production",
+      "type": "end_state",
+      "description": "End state: Remove engineering hold, document recovery evidence, and notify manufacturing that the tool is released.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "open_mrb_case",
+      "type": "end_state",
+      "description": "End state: Open a Material Review Board case for affected lots and notify process engineering, quality, and manufacturing owners.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "escalate_to_equipment_engineering",
+      "type": "end_state",
+      "description": "End state: Escalate to equipment engineering with fault summary, exposed lot list, diagnostic evidence, and current containment status.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "document_no_fault_found",
+      "type": "end_state",
+      "description": "End state: Record the duplicate or false alarm finding, close the investigation, and notify the shift owner.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    }
+  ]
+}

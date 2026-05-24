@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP-to-Skill: 合法 Skill 編譯器</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0c10;
+            --bg-card: rgba(22, 28, 38, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --accent: #d946ef;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --code-bg: #0f131a;
+            --green: #10b981;
+            --amber: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(79, 172, 254, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(217, 70, 239, 0.08) 0%, transparent 40%);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Container & Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #000;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: inline-block;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 30%, var(--primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            font-weight: 300;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Grid Sections */
+        .section-title {
+            font-size: 1.8rem;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+        .section-title i {
+            color: var(--primary);
+        }
+
+        .glass-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 40px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(0, 242, 254, 0.25);
+            box-shadow: 0 10px 35px rgba(0, 242, 254, 0.05);
+        }
+
+        /* Core Idea (Paradigm Shift) */
+        .concept-grid {
+            display: grid;
+            grid-template-columns: 1fr 80px 1fr;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .concept-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .arrow-divider {
+                transform: rotate(90deg);
+                margin: 20px 0;
+            }
+        }
+
+        .concept-box {
+            background: rgba(255,255,255,0.02);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            transition: background 0.3s;
+        }
+        .concept-box.left:hover {
+            background: rgba(245, 158, 11, 0.03);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        .concept-box.right:hover {
+            background: rgba(16, 185, 129, 0.03);
+            border-color: rgba(10, 185, 129, 0.3);
+        }
+
+        .concept-box h3 {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .concept-box.left h3 { color: var(--amber); }
+        .concept-box.right h3 { color: var(--green); }
+
+        .concept-box ul {
+            list-style: none;
+            color: var(--text-muted);
+        }
+
+        .concept-box li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .arrow-divider {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary);
+            font-size: 2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        /* Playground / Compiler Demo */
+        .compiler-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 992px) {
+            .compiler-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .editor-container {
+            position: relative;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--code-bg);
+            overflow: hidden;
+        }
+
+        textarea {
+            width: 100%;
+            height: 380px;
+            background: transparent;
+            border: none;
+            color: #d1d5db;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            padding: 16px;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        /* Tabs on Right Panel */
+        .tabs-header {
+            display: flex;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 12px 18px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: rgba(0, 242, 254, 0.05);
+        }
+
+        .code-display {
+            height: 380px;
+            padding: 16px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #a7f3d0;
+            white-space: pre-wrap;
+            background: var(--code-bg);
+        }
+
+        .markdown-preview {
+            height: 380px;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--code-bg);
+            color: #d1d5db;
+            font-size: 0.92rem;
+        }
+
+        .markdown-preview h1,
+        .markdown-preview h2,
+        .markdown-preview h3 {
+            color: var(--text-main);
+            line-height: 1.25;
+            margin: 18px 0 10px;
+        }
+
+        .markdown-preview h1 { font-size: 1.45rem; }
+        .markdown-preview h2 { font-size: 1.15rem; color: var(--primary); }
+        .markdown-preview h3 { font-size: 1rem; color: #a7f3d0; }
+
+        .markdown-preview p,
+        .markdown-preview li {
+            color: var(--text-muted);
+        }
+
+        .markdown-preview ul {
+            margin: 8px 0 12px 20px;
+        }
+
+        .markdown-preview code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.84em;
+            color: #a7f3d0;
+            background: rgba(255, 255, 255, 0.06);
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .btn-compile {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            width: 100%;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(0, 242, 254, 0.2);
+        }
+
+        .btn-compile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 242, 254, 0.4);
+        }
+
+        .btn-compile:active {
+            transform: translateY(0);
+        }
+
+        .action-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .action-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(0, 242, 254, 0.35);
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.12);
+        }
+
+        /* Status Console Log */
+        .console-log {
+            margin-top: 16px;
+            background: #05070a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .console-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0, 242, 254, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Visual Flow Diagram */
+        .flow-container {
+            width: 100%;
+            min-height: 520px;
+            padding: 0;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #070a0f;
+        }
+
+        .flow-svg {
+            min-width: 100%;
+            display: block;
+        }
+
+        .flow-svg-node {
+            cursor: pointer;
+        }
+
+        .flow-svg-node rect {
+            fill: rgba(255, 255, 255, 0.035);
+            stroke: rgba(255, 255, 255, 0.14);
+            stroke-width: 1.5;
+            transition: fill 0.2s, stroke 0.2s, filter 0.2s;
+        }
+
+        .flow-svg-node:hover rect {
+            fill: rgba(255, 255, 255, 0.07);
+            stroke: rgba(0, 242, 254, 0.45);
+        }
+
+        .flow-svg-node.active rect {
+            fill: rgba(0, 242, 254, 0.08);
+            stroke: var(--primary);
+            filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.25));
+        }
+
+        .flow-edge {
+            fill: none;
+            stroke: rgba(156, 163, 175, 0.55);
+            stroke-width: 1.6;
+        }
+
+        .flow-edge-label {
+            fill: #9ca3af;
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+        }
+
+        .flow-node-type {
+            font-family: 'Outfit', sans-serif;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .flow-node-title {
+            fill: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .flow-node-tool {
+            fill: #9ca3af;
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+        }
+
+        /* Detail Inspector Card */
+        .inspector-panel {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+            min-height: 120px;
+            transition: all 0.3s;
+        }
+
+        .inspector-placeholder {
+            color: var(--text-muted);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 20px;
+        }
+
+        .inspector-placeholder i {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .inspector-content h4 {
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .inspector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 576px) {
+            .inspector-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .inspector-item {
+            background: rgba(255,255,255,0.01);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .inspector-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .inspector-val {
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .inspector-val code {
+            font-family: 'Fira Code', monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary);
+        }
+
+        .simulator-layout {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .simulator-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sim-state-card {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 260px;
+        }
+
+        .sim-state-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0 16px;
+        }
+
+        .sim-pill {
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 4px 10px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .sim-choice-grid {
+            display: grid;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .sim-choice {
+            width: 100%;
+            text-align: left;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 12px 14px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .sim-choice:hover {
+            border-color: rgba(0, 242, 254, 0.35);
+            background: rgba(0, 242, 254, 0.06);
+        }
+
+        .sim-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .sim-control-btn {
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+        }
+
+        .sim-control-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .sim-history {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 340px;
+            overflow-y: auto;
+        }
+
+        .sim-history ol {
+            margin-left: 18px;
+            color: var(--text-muted);
+        }
+
+        .sim-history li {
+            margin-bottom: 10px;
+        }
+
+        .section-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .section-title-row .section-title {
+            margin-bottom: 0;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-main);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .icon-btn:hover {
+            border-color: rgba(0, 242, 254, 0.35);
+            background: rgba(0, 242, 254, 0.06);
+        }
+
+        .rule-editor {
+            width: 100%;
+            height: 380px;
+            padding: 16px;
+            border: none;
+            outline: none;
+            resize: vertical;
+            background: var(--code-bg);
+            color: #a7f3d0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .rule-editor[readonly] {
+            cursor: default;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- Header -->
+        <header>
+            <div class="badge">Open-Source Engine</div>
+            <h1>SOP-to-Skill Compiler</h1>
+            <p>將繁複的「標準作業程序（SOP）」文檔，編譯為可被 Agent 載入的合法 Skill 目錄。</p>
+        </header>
+
+        <!-- Core Concept Section -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="lightbulb"></i> 設計思維：為什麼要轉換？</h2>
+            <div class="concept-grid">
+                
+                <!-- Left: Raw SOP -->
+                <div class="concept-box left">
+                    <h3><i data-lucide="file-text"></i> 傳統 Markdown SOP</h3>
+                    <ul>
+                        <li><i data-lucide="alert-circle" style="color: var(--amber); width:16px;"></i> <b>注意力渙散</b>：AI 閱讀長文容易跳步或忽視規則。</li>
+                        <li><i data-lucide="alert-circle" style="color: var(--amber); width:16px;"></i> <b>安全盲點</b>：無法硬性禁止 AI 跳過特定核准步驟。</li>
+                        <li><i data-lucide="alert-circle" style="color: var(--amber); width:16px;"></i> <b>高 Token 消耗</b>：每次對話都得重傳整份文件。</li>
+                        <li><i data-lucide="alert-circle" style="color: var(--amber); width:16px;"></i> <b>難以除錯</b>：出錯時不知卡在流程的哪個分支。</li>
+                    </ul>
+                </div>
+
+                <!-- Middle: Transition -->
+                <div class="arrow-divider">
+                    <i data-lucide="chevrons-right"></i>
+                </div>
+
+                <!-- Right: Skill -->
+                <div class="concept-box right">
+                    <h3><i data-lucide="package-open"></i> 合法 Skill</h3>
+                    <ul>
+                        <li><i data-lucide="check-circle" style="color: var(--green); width:16px;"></i> <b>標準入口</b>：生成必要的 <code>SKILL.md</code> 與 YAML frontmatter。</li>
+                        <li><i data-lucide="check-circle" style="color: var(--green); width:16px;"></i> <b>硬性安全阻斷</b>：可在特定狀態加上人機協同審核閘。</li>
+                        <li><i data-lucide="check-circle" style="color: var(--green); width:16px;"></i> <b>Bundled Resource</b>：以 <code>flow.json</code> 保存狀態機。</li>
+                        <li><i data-lucide="check-circle" style="color: var(--green); width:16px;"></i> <b>清晰狀態鏈</b>：完美的狀態遷移日誌（State History）。</li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- SOP Conversion Rules -->
+        <section class="glass-card">
+            <div class="section-title-row">
+                <h2 class="section-title"><i data-lucide="list-checks"></i> SOP 轉換規則 (sop_rule.md)</h2>
+                <button class="icon-btn" id="edit-rule-btn" onclick="toggleRuleEdit()" title="編輯 SOP 轉換規則">
+                    <i data-lucide="pencil" style="width:18px;"></i>
+                </button>
+            </div>
+            <div class="editor-container">
+                <textarea id="sop-rule-content" class="rule-editor" readonly oninput="syncRuleContentFromEditor()"></textarea>
+            </div>
+        </section>
+
+        <!-- Interactive Playground -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="terminal"></i> 互動式編譯沙盒 (Playground)</h2>
+            <div class="compiler-layout">
+                
+                <!-- Left: Markdown Editor -->
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="edit-3" style="width:16px;"></i> 輸入 Markdown SOP</div>
+                        <span>sample_sop.md</span>
+                    </div>
+                    <div class="editor-container">
+                        <div class="tabs-header">
+                            <button class="tab-btn active" onclick="switchInputTab(event, 'markdown-raw')"><i data-lucide="file-code" style="width:14px;"></i> 原始 Markdown</button>
+                            <button class="tab-btn" onclick="switchInputTab(event, 'markdown-preview')"><i data-lucide="eye" style="width:14px;"></i> Markdown 預覽</button>
+                        </div>
+                        <textarea id="markdown-input" oninput="renderMarkdownPreview()"># SOP: 半導體機台故障查案程序
+
+## Purpose
+本 SOP 定義半導體生產機台發生 alarm、製程異常或操作員通報後，工程人員診斷、圍堵、修復與復歸機台的查案流程。
+
+## 流程步驟
+
+### Step 1: 確認故障事件
+*   **Description**: 查閱機台 alarm、操作員通報、MES event 與時間戳，確認是否為真實設備故障。
+*   **System/Tool**: `mes_event_lookup` (參數: `tool_id`, `event_time`)
+*   **Branching**:
+    *   **If 故障事件確認**: 進入 **Step 2 (機台停用管制)**
+    *   **If 重複事件或誤報**: 轉移至 **紀錄未發現故障** (State: `document_no_fault_found`)
+
+### Step 2: 機台停用管制
+*   **Description**: 停止受影響機台的新批次進站，並在調查期間將機台設為 engineering hold。
+*   **System/Tool**: `tool_hold_request` (參數: `tool_id`, `hold_reason`)
+*   **Branching**:
+    *   **If hold 套用成功**: 進入 **Step 3 (確認受影響批次)**
+    *   **If hold 無法套用**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 3: 確認受影響批次
+*   **Description**: 查出可能受故障條件影響的 lot、wafer、recipe、chamber 與時間窗。
+*   **System/Tool**: `lot_history_query` (參數: `tool_id`, `event_time`, `lookback_hours`)
+*   **Branching**:
+    *   **If 找到受影響批次**: 進入 **Step 4 (審查製程資料)**
+    *   **If 未找到受影響批次**: 進入 **Step 5 (執行設備診斷)**
+
+### Step 4: 審查製程資料
+*   **Description**: 檢查 SPC chart、sensor trace、metrology result 與 recipe parameter 是否有異常。
+*   **System/Tool**: `process_data_review` (參數: `lot_ids`, `tool_id`, `recipe_id`)
+*   **Branching**:
+    *   **If 發現製程異常**: 轉移至 **開立 MRB 案件** (State: `open_mrb_case`)
+    *   **If 未發現製程異常**: 進入 **Step 5 (執行設備診斷)**
+
+### Step 5: 執行設備診斷
+*   **Description**: 執行設備診斷、檢查 PM 狀態、chamber health 與相關 subsystem logs。
+*   **System/Tool**: `equipment_diagnostics` (參數: `tool_id`, `chamber_id`)
+*   **Branching**:
+    *   **If 找到 root cause**: 進入 **Step 6 (建立改善措施)**
+    *   **If 未找到 root cause**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 6: 建立改善措施
+*   **Description**: 定義修復計畫、驗證需求、責任人與機台 release criteria。
+*   **System/Tool**: `corrective_action_create` (參數: `tool_id`, `root_cause`, `action_owner`)
+*   **Branching**:
+    *   **If 改善措施核准**: 進入 **Step 7 (驗證機台復歸)**
+    *   **If 改善措施駁回**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 7: 驗證機台復歸
+*   **Description**: 執行 qualification check、golden wafer validation 或 monitor lot review。
+*   **System/Tool**: `tool_recovery_verify` (參數: `tool_id`, `qualification_plan`)
+*   **Branching**:
+    *   **If 驗證通過**: 轉移至 **釋放機台回生產** (State: `release_tool_to_production`)
+    *   **If 驗證失敗**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+---
+
+## End States
+
+### State: `release_tool_to_production`
+*   **Action**: 移除 engineering hold，記錄復歸證據，並通知製造端機台可恢復生產。
+
+### State: `open_mrb_case`
+*   **Action**: 對受影響批次開立 MRB 案件，通知製程、品質與製造 owner。
+
+### State: `escalate_to_equipment_engineering`
+*   **Action**: 彙整故障摘要、受影響批次、診斷證據與 containment 狀態後升級設備工程。
+
+### State: `document_no_fault_found`
+*   **Action**: 紀錄重複事件或誤報結論，關閉查案並通知 shift owner。</textarea>
+                        <div id="markdown-preview" class="markdown-preview hidden"></div>
+                    </div>
+                    <input id="md-file-input" type="file" accept=".md,.markdown,text/markdown,text/plain" style="display: none;" onchange="handleMarkdownUpload(event)">
+                    <div class="action-row">
+                        <button class="btn-compile btn-secondary" onclick="document.getElementById('md-file-input').click()"><i data-lucide="upload" style="width:18px;"></i> 上傳 Markdown</button>
+                        <button class="btn-compile btn-secondary" onclick="showTkmsImportPlaceholder()"><i data-lucide="database" style="width:18px;"></i> 從 tKMS 匯入</button>
+                        <button class="btn-compile" onclick="runCompile()"><i data-lucide="play" style="width:18px;"></i> 編譯 SOP 為 Skill</button>
+                    </div>
+                </div>
+
+                <!-- Right: Generated Skill Files -->
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="package" style="width:16px;"></i> 輸出 Skill 目錄</div>
+                        <span id="output-folder-name">skills/tool_fault_investigation/</span>
+                    </div>
+                    <div class="editor-container">
+                        <div class="tabs-header">
+                            <button class="tab-btn active" onclick="switchTab(event, 'skill-md')"><i data-lucide="file-text" style="width:14px;"></i> SKILL.md</button>
+                            <button class="tab-btn" onclick="switchTab(event, 'flow-json')"><i data-lucide="git-fork" style="width:14px;"></i> flow.json</button>
+                        </div>
+                        <div id="code-content" class="code-display">// 點擊「編譯 SOP」按鈕生成合法 Skill...</div>
+                    </div>
+                    <button class="btn-compile btn-secondary" onclick="downloadSkillBundle()"><i data-lucide="download" style="width:18px;"></i> 下載整包 Skill</button>
+                    <div class="console-log">
+                        <div id="log-spinner" class="console-spinner"></div>
+                        <span id="log-text">Ready. Waiting for input...</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="clipboard-check"></i> SOP 品質報告 (sop_quality_report.md)</h2>
+            <div class="editor-container">
+                <div id="quality-report-content" class="code-display"></div>
+            </div>
+        </section>
+
+        <!-- Interactive Flowchart Visualizer -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API、調用參數」與「條件路由跳轉邏輯」。</p>
+            
+            <div class="flow-container" id="flow-container"></div>
+
+            <!-- Inspector Panel -->
+            <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-placeholder">
+                    <i data-lucide="info"></i>
+                    <span>點擊上方流程圖節點，查看編譯後裝載至 Agent 的細節資訊。</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Skill Execution Simulator -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 <code>flow.json</code> 的 start state 開始，點選分支條件來模擬 Skill 執行路徑。</p>
+            <div class="simulator-layout">
+                <div class="sim-state-card" id="simulator-current-state"></div>
+                <div class="sim-history" id="simulator-history"></div>
+            </div>
+            <div class="sim-controls">
+                <button class="sim-control-btn" id="sim-back-btn" onclick="undoSimulation()"><i data-lucide="undo-2" style="width:16px;"></i> 上一步</button>
+                <button class="sim-control-btn" onclick="resetSimulation()"><i data-lucide="rotate-ccw" style="width:16px;"></i> 重新開始</button>
+            </div>
+        </section>
+
+        <footer>
+            <p>SOP-to-Skill Compiler Concept Guide &copy; 2026. Powered by Google Gemini.</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Generated mock files data
+        const generatedFiles = {
+            'skill-md': `---
+name: "semiconductor-tool-fault-investigation-procedure"
+description: "Use when executing the SOP workflow for SOP: Semiconductor Tool Fault Investigation Procedure. Follow the bundled flow.json state machine for deterministic routing, tool calls, decision branches, and terminal states."
+---
+
+# SOP: Semiconductor Tool Fault Investigation Procedure
+
+## Objective
+Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Fault Investigation Procedure.
+
+## Core Rules
+1. Follow the state transition graph defined in \`flow.json\`.
+2. Always begin execution at the state ID: \`confirm_fault_event\`.
+3. Do not jump to subsequent states without verifying transition conditions.
+4. Only use tools explicitly mapped to the current state.
+5. Treat states with type \`end_state\` as terminal states.
+
+## Tools Required
+
+- \`corrective_action_create\`
+- \`equipment_diagnostics\`
+- \`lot_history_query\`
+- \`mes_event_lookup\`
+- \`process_data_review\`
+- \`tool_hold_request\`
+- \`tool_recovery_verify\`
+
+## State Map Reference
+
+### State: \`confirm_fault_event\` (Type: \`action\`)
+- **Description**: Review the tool alarm, operator report, MES event, and timestamp to confirm that a real equipment fault occurred.
+- **Tool**: \`mes_event_lookup\` (Parameters: tool_id, event_time)
+- **Branching / Next States**:
+  - If outcome is \`fault event is confirmed\` -> \`place_tool_on_hold\`
+  - If outcome is \`event is duplicate or false alarm\` -> \`document_no_fault_found\``,
+            'flow-json': `{
+  "sop_name": "SOP: Semiconductor Tool Fault Investigation Procedure",
+  "start_state": "confirm_fault_event",
+  "states": [
+    {
+      "id": "confirm_fault_event",
+      "type": "action",
+      "description": "Confirm that a real equipment fault occurred.",
+      "tool": "mes_event_lookup",
+      "parameters": ["tool_id", "event_time"],
+      "next_states": {
+        "fault event is confirmed": "place_tool_on_hold",
+        "event is duplicate or false alarm": "document_no_fault_found"
+      }
+    },
+    {
+      "id": "place_tool_on_hold",
+      "type": "action",
+      "description": "Stop wafer starts and place the tool on engineering hold.",
+      "tool": "tool_hold_request",
+      "parameters": ["tool_id", "hold_reason"],
+      "next_states": {
+        "hold is applied successfully": "check_lot_exposure",
+        "hold cannot be applied": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "check_lot_exposure",
+      "type": "decision",
+      "description": "Identify lots, wafers, recipes, chambers, and fault window.",
+      "tool": "lot_history_query",
+      "parameters": ["tool_id", "event_time", "lookback_hours"],
+      "next_states": {
+        "exposed lots are found": "review_process_data",
+        "no exposed lots are found": "run_equipment_diagnostics"
+      }
+    },
+    {
+      "id": "review_process_data",
+      "type": "action",
+      "description": "Review SPC, sensor, metrology, and recipe data.",
+      "tool": "process_data_review",
+      "parameters": ["lot_ids", "tool_id", "recipe_id"],
+      "next_states": {
+        "process excursion is detected": "open_mrb_case",
+        "no process excursion is detected": "run_equipment_diagnostics"
+      }
+    },
+    {
+      "id": "run_equipment_diagnostics",
+      "type": "action",
+      "description": "Run equipment diagnostics and inspect subsystem logs.",
+      "tool": "equipment_diagnostics",
+      "parameters": ["tool_id", "chamber_id"],
+      "next_states": {
+        "root cause is identified": "create_corrective_action",
+        "root cause is not identified": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "create_corrective_action",
+      "type": "action",
+      "description": "Define corrective action, repair plan, verification requirement, and tool release criteria.",
+      "tool": "corrective_action_create",
+      "parameters": ["tool_id", "root_cause", "action_owner"],
+      "next_states": {
+        "corrective action is approved": "verify_tool_recovery",
+        "corrective action is rejected": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "verify_tool_recovery",
+      "type": "action",
+      "description": "Run qualification checks, golden wafer validation, or monitor lot review before release.",
+      "tool": "tool_recovery_verify",
+      "parameters": ["tool_id", "qualification_plan"],
+      "next_states": {
+        "verification passes": "release_tool_to_production",
+        "verification fails": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "release_tool_to_production",
+      "type": "end_state",
+      "description": "Remove hold and release the tool back to production."
+    },
+    {
+      "id": "open_mrb_case",
+      "type": "end_state",
+      "description": "Open a Material Review Board case for affected lots."
+    },
+    {
+      "id": "escalate_to_equipment_engineering",
+      "type": "end_state",
+      "description": "Escalate to equipment engineering with evidence and containment status."
+    },
+    {
+      "id": "document_no_fault_found",
+      "type": "end_state",
+      "description": "Record duplicate or false alarm finding and close the investigation."
+    }
+  ]
+}`,
+            'sop-rule-md': `# SOP 轉換規則
+
+撰寫要轉換成 Skill 狀態機的 Markdown SOP 時，請依照本規則整理內容。
+
+## 必要結構
+
+1. 使用一個 H1 標題：
+   - 格式：\`# SOP: <流程名稱>\`
+2. 加上目的段落：
+   - 格式：\`## Purpose\`
+   - 說明 SOP 適用情境，以及流程完成後應達成的結果。
+3. 使用 H3 標題定義流程步驟：
+   - 格式：\`### Step N: <明確的動作名稱>\`
+   - Step 編號應連續，不跳號。
+4. 每個步驟應包含：
+   - \`**Description**\`：描述一個具體動作或判斷。
+   - \`**System/Tool**\`：當此步驟需要呼叫外部系統或工具時必填。
+   - \`**Branching Logic**\`：當下一步取決於條件時必填。
+5. 定義終點狀態：
+   - 區段：\`## End States\`
+   - 格式：\`### State: state_id\`；實際 SOP 中請用 backtick 包住 state ID。
+   - 每個終點狀態都應包含 \`**Action**\`。
+
+## 分支規則
+
+- 每個分支應以 \`**If ...**:\` 開頭。
+- 每個分支應指向另一個編號步驟或明確的狀態 ID。
+- 分支條件應盡量互斥。
+- 避免使用「視情況」、「必要時」、「適當時」這類模糊條件。
+
+## 工具規則
+
+- 工具名稱應用 backtick 標示。
+- 工具參數也應用 backtick 標示。
+- 參數名稱應穩定且具語意，例如 \`tool_id\`、\`lot_ids\`、\`event_time\`、\`recipe_id\`。
+- 如果某步驟只是純判斷，沒有呼叫系統或工具，可以省略 \`System/Tool\`。
+
+## 品質檢查清單
+
+- SOP 有明確的起始步驟。
+- 每個非終點步驟至少有一個往外的 transition。
+- 每個 transition target 都存在。
+- 每個 end state 至少被一個分支連到。
+- State 名稱具體、明確，並偏向動作導向。
+- SOP 提供足夠的工具與參數資訊，讓 Agent 能執行或知道該向使用者要求哪些資訊。`,
+            'quality-report-md': `# SOP 品質報告
+
+- **狀態**: \`通過\`
+- **規則來源**: \`sop_rule.md\`
+- **SOP 名稱**: SOP: Semiconductor Tool Fault Investigation Procedure
+- **解析出的狀態數**: 11
+
+## 檢查發現
+
+- 未發現阻擋轉換的品質問題。
+
+## SOP 修改建議
+
+- 轉換前不需要修改。
+
+## 規則摘要
+
+本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target，以及 end state 可達性。`
+        };
+
+        let currentTab = 'skill-md';
+        let currentInputTab = 'markdown-raw';
+        let simulationState = {
+            currentStateId: null,
+            history: []
+        };
+
+        // Tab switcher
+        function switchTab(e, tabId) {
+            currentTab = tabId;
+            const container = e ? e.currentTarget.closest('.editor-container') : document;
+            container.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if (e) {
+                e.currentTarget.classList.add('active');
+            } else {
+                document.querySelector(`button[onclick*="${tabId}"]`).classList.add('active');
+            }
+            
+            const display = document.getElementById('code-content');
+            if (display.textContent.startsWith('//') || display.textContent === '') {
+                return;
+            }
+            display.textContent = generatedFiles[tabId];
+        }
+
+        function renderInlineMarkdown(value) {
+            return escapeHtml(value)
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        }
+
+        function renderMarkdownPreview() {
+            const markdown = document.getElementById('markdown-input').value;
+            const lines = markdown.split(/\r?\n/);
+            let html = '';
+            let inList = false;
+
+            function closeList() {
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+            }
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    closeList();
+                    return;
+                }
+                if (trimmed === '---') {
+                    closeList();
+                    html += '<hr>';
+                    return;
+                }
+                const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+                if (heading) {
+                    closeList();
+                    html += `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
+                    return;
+                }
+                const bullet = trimmed.match(/^[*-]\s+(.+)$/);
+                if (bullet) {
+                    if (!inList) {
+                        html += '<ul>';
+                        inList = true;
+                    }
+                    html += `<li>${renderInlineMarkdown(bullet[1])}</li>`;
+                    return;
+                }
+                closeList();
+                html += `<p>${renderInlineMarkdown(trimmed)}</p>`;
+            });
+            closeList();
+            document.getElementById('markdown-preview').innerHTML = html;
+        }
+
+        function switchInputTab(e, tabId) {
+            currentInputTab = tabId;
+            const container = e.currentTarget.closest('.editor-container');
+            container.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            renderMarkdownPreview();
+            document.getElementById('markdown-input').classList.toggle('hidden', tabId !== 'markdown-raw');
+            document.getElementById('markdown-preview').classList.toggle('hidden', tabId !== 'markdown-preview');
+        }
+
+        function makeStateId(title) {
+            const stepMatch = title.match(/^Step\s+(\d+)/i);
+            const normalized = title
+                .replace(/^Step\s+\d+:\s*/i, '')
+                .replace(/^State:\s*/i, '')
+                .replaceAll('`', '')
+                .replace(/[^a-zA-Z0-9\s]/g, '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '_');
+            return normalized || (stepMatch ? `step_${stepMatch[1]}` : 'unnamed_state');
+        }
+
+        function compileMarkdownToFlow(markdown) {
+            const titleMatch = markdown.match(/^#\s+(.+)$/m);
+            const sopName = titleMatch ? titleMatch[1].trim() : 'Generated SOP';
+            const sections = markdown.split(/^###\s+/m).slice(1);
+            const stepNumberToId = {};
+            const stepTitleToId = {};
+            const states = [];
+
+            sections.forEach(section => {
+                const titleLine = section.split('\n')[0].trim();
+                if (/^State:/i.test(titleLine)) return;
+                const id = makeStateId(titleLine);
+                const stepMatch = titleLine.match(/^Step\s+(\d+):\s*(.+)$/i);
+                if (stepMatch) {
+                    stepNumberToId[stepMatch[1]] = id;
+                    stepTitleToId[stepMatch[2].toLowerCase().trim()] = id;
+                }
+                stepTitleToId[titleLine.toLowerCase().trim()] = id;
+            });
+
+            function resolveTarget(text) {
+                const explicitState = text.match(/State:\s*`([^`]+)`/i);
+                if (explicitState) return explicitState[1].trim();
+
+                const stepRef = text.match(/Step\s+(\d+)/i);
+                if (stepRef && stepNumberToId[stepRef[1]]) return stepNumberToId[stepRef[1]];
+
+                const lowered = text.toLowerCase();
+                for (const [title, id] of Object.entries(stepTitleToId)) {
+                    if (title && lowered.includes(title)) return id;
+                }
+
+                const codeRef = text.match(/`([^`]+)`/);
+                return codeRef ? codeRef[1].trim() : '';
+            }
+
+            sections.forEach(section => {
+                const lines = section.split('\n');
+                const titleLine = lines[0].trim();
+                if (/^State:/i.test(titleLine)) return;
+
+                const id = makeStateId(titleLine);
+                let description = `Execute step: ${titleLine}`;
+                let tool = null;
+                let parameters = null;
+                const nextStates = {};
+
+                lines.slice(1).forEach(line => {
+                    const trimmed = line.trim();
+                    if (/\*\*Description\*\*:/i.test(trimmed)) {
+                        description = trimmed.split(/:\s*/).slice(1).join(': ').trim();
+                    }
+                    if (/\*\*System\/Tool\*\*:/i.test(trimmed)) {
+                        const codeMatches = [...trimmed.matchAll(/`([^`]+)`/g)].map(match => match[1]);
+                        tool = codeMatches[0] || null;
+                        parameters = codeMatches.length > 1 ? codeMatches.slice(1) : null;
+                    }
+                    const branch = trimmed.match(/\*\*If\s+([^:]+)\*\*:\s*(.+)$/i) || trimmed.match(/If\s+([^:]+):\s*(.+)$/i);
+                    if (branch) {
+                        const target = resolveTarget(branch[2]);
+                        if (target) nextStates[branch[1].toLowerCase().trim()] = target;
+                    }
+                });
+
+                states.push({
+                    id,
+                    type: /check|evaluate/i.test(id) ? 'decision' : 'action',
+                    description,
+                    tool,
+                    parameters,
+                    next_states: Object.keys(nextStates).length ? nextStates : null
+                });
+            });
+
+            const endStateMatches = [...markdown.matchAll(/^###\s+State:\s*`([^`]+)`\s*\n\*\s+\*\*Action\*\*:\s*(.+)$/gm)];
+            endStateMatches.forEach(match => {
+                states.push({
+                    id: match[1].trim(),
+                    type: 'end_state',
+                    description: `End state: ${match[2].trim()}`,
+                    tool: null,
+                    parameters: null,
+                    next_states: null
+                });
+            });
+
+            return {
+                sop_name: sopName,
+                start_state: states[0]?.id || '',
+                states
+            };
+        }
+
+        // Run compiler simulator
+        function runCompile() {
+            const spinner = document.getElementById('log-spinner');
+            const logText = document.getElementById('log-text');
+            const display = document.getElementById('code-content');
+            
+            display.textContent = '';
+            spinner.style.display = 'block';
+            
+            const steps = [
+                '正在讀取 Markdown SOP 檔案...',
+                '正在發送至 Gemini 2.5 Flash 模型...',
+                '正在解析與結構化狀態圖 (StateMachine)...',
+                '正在識別與關聯系統 Tool API 宣告...',
+                '正在建立 Skill 目錄 /skills/tool_fault_investigation...',
+                '寫入檔案 SKILL.md (合法 Skill 入口完成)...',
+                '寫入檔案 flow.json (流程圖編譯完成)...',
+                '執行 Skill 格式驗證...',
+                '編譯完成！此目錄可被 Agent 作為 Skill 載入。'
+            ];
+
+            let currentStep = 0;
+            const interval = setInterval(() => {
+                logText.textContent = steps[currentStep];
+                currentStep++;
+                
+                if (currentStep >= steps.length) {
+                    clearInterval(interval);
+                    spinner.style.display = 'none';
+                    const flow = compileMarkdownToFlow(document.getElementById('markdown-input').value);
+                    generatedFiles['flow-json'] = JSON.stringify(flow, null, 2);
+                    syncSkillMarkdownFromFlow();
+                    syncQualityReport(document.getElementById('markdown-input').value);
+                    renderRuleAndReportBlocks();
+                    renderFlowFromGeneratedJson();
+                    resetSimulation();
+                    display.textContent = generatedFiles[currentTab];
+                }
+            }, 600);
+        }
+
+        function parseGeneratedFlow() {
+            return JSON.parse(generatedFiles['flow-json']);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function buildSkillMarkdown(flow) {
+            const tools = [...new Set(flow.states.map(state => state.tool).filter(Boolean))].sort();
+            const skillName = flow.sop_name
+                .replace(/^SOP:\s*/i, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '') || 'generated-sop-skill';
+
+            let md = `---\n`;
+            md += `name: "${skillName}"\n`;
+            md += `description: "Use when executing the SOP workflow for ${flow.sop_name}. Follow the bundled flow.json state machine for deterministic routing, tool calls, decision branches, and terminal states."\n`;
+            md += `---\n\n# ${flow.sop_name}\n\n`;
+            md += `## Objective\nExecute the Standard Operating Procedure (SOP) for: ${flow.sop_name}.\n\n`;
+            md += `## Core Rules\n`;
+            md += `1. Follow the state transition graph defined in \`flow.json\`.\n`;
+            md += `2. Always begin execution at the state ID: \`${flow.start_state}\`.\n`;
+            md += `3. Do not jump to subsequent states without verifying transition conditions.\n`;
+            md += `4. Only use tools explicitly mapped to the current state.\n`;
+            md += `5. Treat states with type \`end_state\` as terminal states.\n\n`;
+
+            if (tools.length) {
+                md += `## Tools Required\n\n${tools.map(tool => `- \`${tool}\``).join('\n')}\n\n`;
+            }
+
+            md += `## State Map Reference\n\n`;
+            flow.states.forEach(state => {
+                md += `### State: \`${state.id}\` (Type: \`${state.type}\`)\n`;
+                md += `- **Description**: ${state.description}\n`;
+                if (state.tool) {
+                    const params = state.parameters?.length ? ` (Parameters: ${state.parameters.join(', ')})` : '';
+                    md += `- **Tool**: \`${state.tool}\`${params}\n`;
+                }
+                if (state.next_states && Object.keys(state.next_states).length) {
+                    md += `- **Branching / Next States**:\n`;
+                    Object.entries(state.next_states).forEach(([condition, target]) => {
+                        md += `  - If outcome is \`${condition}\` -> transition to \`${target}\`\n`;
+                    });
+                } else {
+                    md += `- **Termination**: This is an end state.\n`;
+                }
+                md += `\n`;
+            });
+
+            return md;
+        }
+
+        function syncSkillMarkdownFromFlow() {
+            generatedFiles['skill-md'] = buildSkillMarkdown(parseGeneratedFlow());
+        }
+
+        function renderRuleAndReportBlocks() {
+            document.getElementById('sop-rule-content').value = generatedFiles['sop-rule-md'];
+            document.getElementById('quality-report-content').textContent = generatedFiles['quality-report-md'];
+        }
+
+        function syncRuleContentFromEditor() {
+            generatedFiles['sop-rule-md'] = document.getElementById('sop-rule-content').value;
+        }
+
+        function toggleRuleEdit() {
+            const editor = document.getElementById('sop-rule-content');
+            const button = document.getElementById('edit-rule-btn');
+            const isReadonly = editor.hasAttribute('readonly');
+            if (isReadonly) {
+                editor.removeAttribute('readonly');
+                button.innerHTML = '<i data-lucide="lock" style="width:18px;"></i>';
+                button.title = '鎖定 SOP 轉換規則';
+                editor.focus();
+            } else {
+                syncRuleContentFromEditor();
+                editor.setAttribute('readonly', 'readonly');
+                button.innerHTML = '<i data-lucide="pencil" style="width:18px;"></i>';
+                button.title = '編輯 SOP 轉換規則';
+            }
+            lucide.createIcons();
+        }
+
+        function buildQualityReport(markdown, flow) {
+            const findings = [];
+            const suggestions = [];
+
+            if (!/^#\s+SOP:\s+.+/m.test(markdown)) {
+                findings.push('缺少 H1 標題，或標題格式不符合規則。預期格式為 `# SOP: <流程名稱>`。');
+                suggestions.push('將最上層標題改為 `# SOP: <流程名稱>`。');
+            }
+            if (!/^##\s+Purpose\b/m.test(markdown)) {
+                findings.push('缺少 `## Purpose` 區段。');
+                suggestions.push('新增 Purpose 區段，說明 SOP 適用情境與流程完成後應產生的結果。');
+            }
+
+            const stepMatches = [...markdown.matchAll(/^###\s+Step\s+(\d+):\s+(.+)$/gm)];
+            if (!stepMatches.length) {
+                findings.push('找不到編號式流程步驟。');
+                suggestions.push('每個流程步驟請使用 `### Step 1: Confirm Fault Event` 這類標題格式。');
+            } else {
+                const numbers = stepMatches.map(match => Number(match[1]));
+                const expected = numbers.map((_, index) => index + 1);
+                if (numbers.join(',') !== expected.join(',')) {
+                    findings.push(`Step 編號不連續。偵測到 [${numbers.join(', ')}]，預期為 [${expected.join(', ')}]。`);
+                    suggestions.push('重新編排 Step 編號，從 1 開始且不中斷。');
+                }
+            }
+
+            if (!/^##\s+End States\b/m.test(markdown)) {
+                findings.push('缺少 `## End States` 區段。');
+                suggestions.push('在 `## End States` 下新增終點狀態，格式使用 `### State: state_id`。');
+            }
+
+            const sections = markdown.split(/^###\s+/m).slice(1);
+            sections.forEach(section => {
+                const [titleLine = '', ...bodyLines] = section.split('\n');
+                const title = titleLine.trim();
+                const body = bodyLines.join('\n');
+                if (/^State:/i.test(title)) {
+                    if (!body.includes('**Action**')) {
+                        findings.push(`終點狀態 \`${title}\` 缺少 \`**Action**\`。`);
+                        suggestions.push(`為 \`${title}\` 補上終點動作說明。`);
+                    }
+                    return;
+                }
+                if (!body.includes('**Description**')) {
+                    findings.push(`步驟 \`${title}\` 缺少 \`**Description**\`。`);
+                    suggestions.push(`為 \`${title}\` 補上一句具體的步驟描述。`);
+                }
+                if (!/\*\*If\s+[^:]+\*\*:/i.test(body)) {
+                    findings.push(`步驟 \`${title}\` 沒有定義清楚的分支邏輯。`);
+                    suggestions.push(`為 \`${title}\` 加上明確的 \`**If ...**:\` 分支。`);
+                }
+            });
+
+            const validIds = new Set(flow.states.map(state => state.id));
+            const referencedIds = new Set();
+            flow.states.forEach(state => {
+                if (state.type !== 'end_state' && (!state.next_states || !Object.keys(state.next_states).length)) {
+                    findings.push(`狀態 \`${state.id}\` 沒有往外的 transition。`);
+                    suggestions.push(`為 \`${state.id}\` 加上分支邏輯，讓流程可以繼續或結束。`);
+                }
+                Object.values(state.next_states || {}).forEach(target => {
+                    referencedIds.add(target);
+                    if (!validIds.has(target)) {
+                        findings.push(`狀態 \`${state.id}\` 指向不存在的目標 \`${target}\`。`);
+                        suggestions.push(`將 \`${target}\` 定義為步驟或終點狀態，或修正分支目標。`);
+                    }
+                });
+            });
+            flow.states
+                .filter(state => state.type === 'end_state' && !referencedIds.has(state.id))
+                .forEach(state => {
+                    findings.push(`終點狀態 \`${state.id}\` 沒有任何分支會連到它。`);
+                    suggestions.push(`新增一個會轉移到 \`${state.id}\` 的分支，或移除未使用的終點狀態。`);
+                });
+
+            const uniqueSuggestions = [...new Set(suggestions)];
+            let report = `# SOP 品質報告\n\n`;
+            report += `- **狀態**: \`${findings.length ? '需要修訂' : '通過'}\`\n`;
+            report += `- **規則來源**: \`sop_rule.md\`\n`;
+            report += `- **SOP 名稱**: ${flow.sop_name}\n`;
+            report += `- **解析出的狀態數**: ${flow.states.length}\n\n`;
+            report += `## 檢查發現\n\n`;
+            report += findings.length ? findings.map(item => `- ${item}`).join('\n') : '- 未發現阻擋轉換的品質問題。';
+            report += `\n\n## SOP 修改建議\n\n`;
+            report += uniqueSuggestions.length ? uniqueSuggestions.map(item => `- ${item}`).join('\n') : '- 轉換前不需要修改。';
+            report += `\n\n## 規則摘要\n\n`;
+            report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target，以及 end state 可達性。`;
+            return report;
+        }
+
+        function syncQualityReport(markdown) {
+            generatedFiles['quality-report-md'] = buildQualityReport(markdown, parseGeneratedFlow());
+        }
+
+        function rebuildGeneratedFilesFromCurrentMarkdown() {
+            const markdown = document.getElementById('markdown-input').value;
+            const flow = compileMarkdownToFlow(markdown);
+            generatedFiles['flow-json'] = JSON.stringify(flow, null, 2);
+            syncSkillMarkdownFromFlow();
+            syncQualityReport(markdown);
+        }
+
+        function renderFlowFromGeneratedJson() {
+            const flow = parseGeneratedFlow();
+            const container = document.getElementById('flow-container');
+            container.innerHTML = '';
+
+            const svgNs = 'http://www.w3.org/2000/svg';
+            const nodeWidth = 240;
+            const nodeHeight = 92;
+            const gapX = 110;
+            const gapY = 108;
+            const columns = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(flow.states.length))));
+            const positions = new Map();
+            const width = Math.max(920, columns * nodeWidth + (columns - 1) * gapX + 80);
+            const rows = Math.ceil(flow.states.length / columns);
+            const height = Math.max(520, rows * nodeHeight + (rows - 1) * gapY + 90);
+
+            flow.states.forEach((state, index) => {
+                const row = Math.floor(index / columns);
+                const col = index % columns;
+                positions.set(state.id, {
+                    x: 40 + col * (nodeWidth + gapX),
+                    y: 40 + row * (nodeHeight + gapY)
+                });
+            });
+
+            const svg = document.createElementNS(svgNs, 'svg');
+            svg.setAttribute('class', 'flow-svg');
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+
+            const defs = document.createElementNS(svgNs, 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M 0 0 L 10 4 L 0 8 z" fill="rgba(156, 163, 175, 0.75)"></path>
+                </marker>
+            `;
+            svg.appendChild(defs);
+
+            flow.states.forEach(state => {
+                const from = positions.get(state.id);
+                Object.entries(state.next_states || {}).forEach(([condition, target], index) => {
+                    const to = positions.get(target);
+                    if (!to) return;
+
+                    const x1 = from.x + nodeWidth;
+                    const y1 = from.y + nodeHeight / 2 + index * 8;
+                    const x2 = to.x;
+                    const y2 = to.y + nodeHeight / 2;
+                    const midX = (x1 + x2) / 2;
+                    const path = document.createElementNS(svgNs, 'path');
+                    path.setAttribute('class', 'flow-edge');
+                    path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+                    path.setAttribute('marker-end', 'url(#arrowhead)');
+                    svg.appendChild(path);
+
+                    const label = document.createElementNS(svgNs, 'text');
+                    label.setAttribute('class', 'flow-edge-label');
+                    label.setAttribute('x', midX - 54);
+                    label.setAttribute('y', (y1 + y2) / 2 - 6 - index * 10);
+                    label.textContent = condition.length > 28 ? `${condition.slice(0, 25)}...` : condition;
+                    svg.appendChild(label);
+                });
+            });
+
+            flow.states.forEach(state => {
+                const pos = positions.get(state.id);
+                const group = document.createElementNS(svgNs, 'g');
+                const typeClass = state.type === 'end_state' ? 'end' : state.type;
+                const typeColor = state.type === 'decision' ? 'var(--accent)' : state.type === 'end_state' ? 'var(--green)' : 'var(--secondary)';
+                group.setAttribute('class', 'flow-svg-node');
+                group.dataset.nodeId = state.id;
+                group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+
+                const title = state.id.length > 26 ? `${state.id.slice(0, 23)}...` : state.id;
+                const tool = state.tool ? `tool: ${state.tool}` : state.type === 'end_state' ? 'terminal state' : 'no tool';
+                const toolText = tool.length > 32 ? `${tool.slice(0, 29)}...` : tool;
+                group.innerHTML = `
+                    <rect width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
+                    <text class="flow-node-type" x="16" y="22" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
+                    <text class="flow-node-title" x="16" y="48">${escapeHtml(title)}</text>
+                    <text class="flow-node-tool" x="16" y="72">${escapeHtml(toolText)}</text>
+                `;
+                group.addEventListener('click', () => inspectNode(state.id, group));
+                svg.appendChild(group);
+            });
+
+            container.appendChild(svg);
+        }
+
+        function inspectNode(nodeId, el) {
+            document.querySelectorAll('.flow-svg-node').forEach(node => node.classList.remove('active'));
+            el.classList.add('active');
+
+            const flow = parseGeneratedFlow();
+            const state = flow.states.find(item => item.id === nodeId);
+            const transitions = state.next_states && Object.keys(state.next_states).length
+                ? `<ul>${Object.entries(state.next_states).map(([condition, target]) => `<li><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}</li>`).join('')}</ul>`
+                : 'None (Terminal state)';
+            const panel = document.getElementById('inspector-panel');
+
+            panel.innerHTML = `
+                <div class="inspector-content">
+                    <h4><i data-lucide="info" style="color: var(--primary)"></i> 節點詳情: <code>${escapeHtml(state.id)}</code></h4>
+                    <div class="inspector-grid">
+                        <div class="inspector-item">
+                            <div class="inspector-label">節點類型 (Node Type)</div>
+                            <div class="inspector-val" style="color: ${state.type.includes('decision') ? 'var(--accent)' : state.type.includes('end') ? 'var(--green)' : 'var(--secondary)'}">${escapeHtml(state.type.toUpperCase())}</div>
+                        </div>
+                        <div class="inspector-item">
+                            <div class="inspector-label">關聯工具 (System Tool)</div>
+                            <div class="inspector-val"><code>${escapeHtml(state.tool || 'None')}</code></div>
+                        </div>
+                        <div class="inspector-item" style="grid-column: span 2">
+                            <div class="inspector-label">節點敘述</div>
+                            <div class="inspector-val">${escapeHtml(state.description)}</div>
+                        </div>
+                        <div class="inspector-item">
+                            <div class="inspector-label">所需參數 (Params)</div>
+                            <div class="inspector-val"><code>${escapeHtml((state.parameters || []).join(', ') || 'None')}</code></div>
+                        </div>
+                        <div class="inspector-item">
+                            <div class="inspector-label">下一步跳轉路由</div>
+                            <div class="inspector-val">${transitions}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function getStateById(stateId) {
+            return parseGeneratedFlow().states.find(state => state.id === stateId);
+        }
+
+        function resetSimulation() {
+            const flow = parseGeneratedFlow();
+            simulationState = {
+                currentStateId: flow.start_state,
+                history: flow.start_state ? [{ stateId: flow.start_state, condition: 'start' }] : []
+            };
+            renderSkillSimulator();
+        }
+
+        function stepSimulation(condition, targetStateId) {
+            simulationState.currentStateId = targetStateId;
+            simulationState.history.push({ stateId: targetStateId, condition });
+            renderSkillSimulator();
+        }
+
+        function undoSimulation() {
+            if (simulationState.history.length <= 1) return;
+            simulationState.history.pop();
+            simulationState.currentStateId = simulationState.history[simulationState.history.length - 1].stateId;
+            renderSkillSimulator();
+        }
+
+        function renderSkillSimulator() {
+            const currentPanel = document.getElementById('simulator-current-state');
+            const historyPanel = document.getElementById('simulator-history');
+            const backBtn = document.getElementById('sim-back-btn');
+            const state = getStateById(simulationState.currentStateId);
+
+            if (!state) {
+                currentPanel.innerHTML = '<p style="color: var(--text-muted);">尚未產生可模擬的 flow.json。</p>';
+                historyPanel.innerHTML = '<h4>執行歷程</h4><p style="color: var(--text-muted);">尚無歷程。</p>';
+                backBtn.disabled = true;
+                return;
+            }
+
+            const choices = Object.entries(state.next_states || {});
+            const params = (state.parameters || []).join(', ') || 'None';
+            currentPanel.innerHTML = `
+                <h3><code>${escapeHtml(state.id)}</code></h3>
+                <div class="sim-state-meta">
+                    <span class="sim-pill">${escapeHtml(state.type)}</span>
+                    <span class="sim-pill">tool: ${escapeHtml(state.tool || 'None')}</span>
+                    <span class="sim-pill">params: ${escapeHtml(params)}</span>
+                </div>
+                <p style="color: var(--text-muted);">${escapeHtml(state.description)}</p>
+                <div class="sim-choice-grid">
+                    ${choices.length
+                        ? choices.map(([condition, target]) => `<button class="sim-choice" onclick="stepSimulation('${escapeHtml(condition)}', '${escapeHtml(target)}')"><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}</button>`).join('')
+                        : '<div class="sim-pill">已抵達終點狀態，流程結束。</div>'}
+                </div>
+            `;
+
+            historyPanel.innerHTML = `
+                <h4>執行歷程</h4>
+                <ol>
+                    ${simulationState.history.map(item => `<li><code>${escapeHtml(item.stateId)}</code><br><span>${escapeHtml(item.condition)}</span></li>`).join('')}
+                </ol>
+            `;
+            backBtn.disabled = simulationState.history.length <= 1;
+            lucide.createIcons();
+        }
+
+        function handleMarkdownUpload(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                document.getElementById('markdown-input').value = reader.result;
+                renderMarkdownPreview();
+                document.getElementById('log-text').textContent = `Loaded ${file.name}. Ready to compile.`;
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
+        function showTkmsImportPlaceholder() {
+            const pageId = prompt('請輸入 tKMS Page ID');
+            const suffix = pageId ? `Page ID: ${pageId}` : '未提供 Page ID';
+            document.getElementById('log-text').textContent = `從 tKMS 匯入功能開發中。${suffix}`;
+            alert('從 tKMS 匯入功能開發中');
+        }
+
+        function crc32(text) {
+            const bytes = new TextEncoder().encode(text);
+            let crc = 0xffffffff;
+            for (const byte of bytes) {
+                crc ^= byte;
+                for (let i = 0; i < 8; i++) {
+                    crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+                }
+            }
+            return (crc ^ 0xffffffff) >>> 0;
+        }
+
+        function uint16(value) {
+            return [value & 0xff, (value >>> 8) & 0xff];
+        }
+
+        function uint32(value) {
+            return [
+                value & 0xff,
+                (value >>> 8) & 0xff,
+                (value >>> 16) & 0xff,
+                (value >>> 24) & 0xff
+            ];
+        }
+
+        function createZipBlob(files) {
+            const encoder = new TextEncoder();
+            const localParts = [];
+            const centralParts = [];
+            let offset = 0;
+
+            files.forEach(file => {
+                const nameBytes = encoder.encode(file.name);
+                const dataBytes = encoder.encode(file.content);
+                const checksum = crc32(file.content);
+                const localHeader = new Uint8Array([
+                    ...uint32(0x04034b50),
+                    ...uint16(20),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint32(checksum),
+                    ...uint32(dataBytes.length),
+                    ...uint32(dataBytes.length),
+                    ...uint16(nameBytes.length),
+                    ...uint16(0)
+                ]);
+
+                localParts.push(localHeader, nameBytes, dataBytes);
+
+                const centralHeader = new Uint8Array([
+                    ...uint32(0x02014b50),
+                    ...uint16(20),
+                    ...uint16(20),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint32(checksum),
+                    ...uint32(dataBytes.length),
+                    ...uint32(dataBytes.length),
+                    ...uint16(nameBytes.length),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint16(0),
+                    ...uint32(0),
+                    ...uint32(offset)
+                ]);
+
+                centralParts.push(centralHeader, nameBytes);
+                offset += localHeader.length + nameBytes.length + dataBytes.length;
+            });
+
+            const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+            const endRecord = new Uint8Array([
+                ...uint32(0x06054b50),
+                ...uint16(0),
+                ...uint16(0),
+                ...uint16(files.length),
+                ...uint16(files.length),
+                ...uint32(centralSize),
+                ...uint32(offset),
+                ...uint16(0)
+            ]);
+
+            return new Blob([...localParts, ...centralParts, endRecord], { type: 'application/zip' });
+        }
+
+        async function downloadSkillBundle() {
+            syncSkillMarkdownFromFlow();
+            syncRuleContentFromEditor();
+            syncQualityReport(document.getElementById('markdown-input').value);
+            const folder = 'tool_fault_investigation/';
+            const blob = createZipBlob([
+                { name: `${folder}SKILL.md`, content: generatedFiles['skill-md'] },
+                { name: `${folder}flow.json`, content: generatedFiles['flow-json'] },
+                { name: `${folder}sop_rule.md`, content: generatedFiles['sop-rule-md'] },
+                { name: `${folder}sop_quality_report.md`, content: generatedFiles['quality-report-md'] }
+            ]);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'tool_fault_investigation_skill.zip';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        rebuildGeneratedFilesFromCurrentMarkdown();
+        renderRuleAndReportBlocks();
+        renderMarkdownPreview();
+        renderFlowFromGeneratedJson();
+        resetSimulation();
+    </script>
+</body>
+</html>

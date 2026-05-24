@@ -1,0 +1,138 @@
+{
+  "sop_name": "SOP: Furnace Temperature Drift Investigation Procedure",
+  "start_state": "confirm_temperature_drift_event",
+  "states": [
+    {
+      "id": "confirm_temperature_drift_event",
+      "type": "action",
+      "description": "Review furnace alarm history, recipe setpoint, actual temperature trace, and event timestamp to confirm the drift condition.",
+      "tool": "furnace_alarm_lookup",
+      "parameters": [
+        "tool_id",
+        "event_time"
+      ],
+      "next_states": {
+        "drift is confirmed": "place_furnace_on_hold",
+        "drift is not confirmed": "document_no_fault_found"
+      }
+    },
+    {
+      "id": "place_furnace_on_hold",
+      "type": "action",
+      "description": "Stop new lots from entering the furnace and place the equipment under engineering hold.",
+      "tool": "tool_hold_request",
+      "parameters": [
+        "tool_id",
+        "hold_reason"
+      ],
+      "next_states": {
+        "hold is applied successfully": "identify_exposed_lots",
+        "hold cannot be applied": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "identify_exposed_lots",
+      "type": "action",
+      "description": "Query lot history to identify wafers processed during the temperature drift window.",
+      "tool": "lot_history_query",
+      "parameters": [
+        "tool_id",
+        "event_time",
+        "lookback_hours"
+      ],
+      "next_states": {
+        "exposed lots are found": "review_metrology_impact",
+        "no exposed lots are found": "run_furnace_diagnostics"
+      }
+    },
+    {
+      "id": "review_metrology_impact",
+      "type": "action",
+      "description": "Review film thickness, uniformity, oxide growth rate, and SPC trends for exposed lots.",
+      "tool": "metrology_review",
+      "parameters": [
+        "lot_ids",
+        "measurement_type"
+      ],
+      "next_states": {
+        "metrology excursion is detected": "open_mrb_case",
+        "no metrology excursion is detected": "run_furnace_diagnostics"
+      }
+    },
+    {
+      "id": "run_furnace_diagnostics",
+      "type": "action",
+      "description": "Check thermocouple calibration, heater zone status, gas flow stability, and controller logs.",
+      "tool": "furnace_diagnostics",
+      "parameters": [
+        "tool_id",
+        "zone_id"
+      ],
+      "next_states": {
+        "root cause is identified": "create_corrective_action",
+        "root cause is not identified": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "create_corrective_action",
+      "type": "action",
+      "description": "Define repair action, post-maintenance qualification, owner, and release criteria.",
+      "tool": "corrective_action_create",
+      "parameters": [
+        "tool_id",
+        "root_cause",
+        "action_owner"
+      ],
+      "next_states": {
+        "corrective action is approved": "verify_furnace_recovery",
+        "corrective action is rejected": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "verify_furnace_recovery",
+      "type": "action",
+      "description": "Run qualification recipe and confirm temperature stability before production release.",
+      "tool": "tool_recovery_verify",
+      "parameters": [
+        "tool_id",
+        "qualification_plan"
+      ],
+      "next_states": {
+        "verification passes": "release_furnace_to_production",
+        "verification fails": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "release_furnace_to_production",
+      "type": "end_state",
+      "description": "End state: Remove engineering hold, attach recovery evidence, and notify manufacturing that the furnace is released.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "open_mrb_case",
+      "type": "end_state",
+      "description": "End state: Open a Material Review Board case for exposed lots and notify process engineering and quality owners.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "escalate_to_equipment_engineering",
+      "type": "end_state",
+      "description": "End state: Escalate with alarm records, lot exposure, diagnostic evidence, and current containment status.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "document_no_fault_found",
+      "type": "end_state",
+      "description": "End state: Record no-fault finding, close the event, and notify the shift owner.",
+      "tool": null,
+      "parameters": null,
+      "next_states": null
+    }
+  ]
+}
