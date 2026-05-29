@@ -473,10 +473,31 @@
             stroke-width: 1.6;
         }
 
+        .flow-edge.back {
+            stroke: rgba(245, 158, 11, 0.65);
+            stroke-dasharray: 6 4;
+        }
+
         .flow-edge-label {
             fill: #9ca3af;
             font-family: 'Fira Code', monospace;
             font-size: 10px;
+            /* Outline so labels stay readable where they sit over edges. */
+            stroke: #070a0f;
+            stroke-width: 3px;
+            stroke-linejoin: round;
+            paint-order: stroke fill;
+        }
+
+        .flow-edge-label.back {
+            fill: var(--amber);
+        }
+
+        .flow-node-kind {
+            font-family: 'Fira Code', monospace;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
 
         .flow-node-type {
@@ -887,9 +908,10 @@
                     <input id="md-file-input" type="file" accept=".md,.markdown,text/markdown,text/plain" style="display: none;" onchange="handleMarkdownUpload(event)">
                     <div class="action-row">
                         <button class="btn-compile btn-secondary" onclick="document.getElementById('md-file-input').click()"><i data-lucide="upload" style="width:18px;"></i> 上傳 Markdown</button>
+                        <button class="btn-compile btn-secondary" onclick="loadApiMcpSample()"><i data-lucide="plug-zap" style="width:18px;"></i> 載入 API + MCP 範例</button>
                         <button class="btn-compile btn-secondary" onclick="showTkmsImportPlaceholder()"><i data-lucide="database" style="width:18px;"></i> 從 tKMS 匯入</button>
-                        <button class="btn-compile" onclick="runCompile()"><i data-lucide="play" style="width:18px;"></i> 編譯 SOP 為 Skill</button>
                     </div>
+                    <button class="btn-compile" onclick="runCompile()"><i data-lucide="play" style="width:18px;"></i> 編譯 SOP 為 Skill</button>
                 </div>
 
                 <!-- Right: Generated Skill Files -->
@@ -959,9 +981,71 @@
 
     </div>
 
+    <script type="text/markdown" id="sample-api-mcp"># SOP: 機台異常自動通報與工單程序
+
+## Purpose
+本 SOP 定義機台異常事件的自動圍堵與通報流程，混合內部系統 **API**（MES / EAP）與 **MCP** server 工具（Jira、Slack），讓 Agent 同時能對設備執行動作並透過協作工具通報。
+
+## 流程步驟
+
+### Step 1: 偵測異常事件
+*   **Description**: 查閱機台 alarm、MES event 與時間戳，確認是否為真實異常而非重複或誤報。
+*   **System/Tool**: `mes_event_lookup` (API) (參數: `tool_id`, `event_time`)
+*   **Branching**:
+    *   **If 異常確認**: 進入 **Step 2 (機台停用)**
+    *   **If 為誤報**: 轉移至 **紀錄未發現故障** (State: `document_no_fault_found`)
+
+### Step 2: 機台停用
+*   **Description**: 透過設備自動化 API 停止新批次進站，並將受影響機台設為 engineering hold。
+*   **System/Tool**: `eap_tool_hold` (API) (參數: `tool_id`, `hold_reason`)
+*   **Branching**:
+    *   **If hold 套用成功**: 進入 **Step 3 (建立追蹤工單)**
+    *   **If hold 無法套用**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 3: 建立追蹤工單
+*   **Description**: 為異常開立追蹤工單，使調查具備可稽核紀錄與負責人。
+*   **System/Tool**: `mcp__jira__create_issue` (MCP) (參數: `project_key`, `summary`, `severity`)
+*   **Branching**:
+    *   **If 工單建立成功**: 進入 **Step 4 (通報 On-Call 負責人)**
+    *   **If 工單建立失敗**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 4: 通報 On-Call 負責人
+*   **Description**: 將異常摘要與工單連結張貼至設備 on-call 頻道，呼叫負責工程師。
+*   **System/Tool**: `mcp__slack__post_message` (MCP) (參數: `channel`, `message`)
+*   **Branching**:
+    *   **If 通報送達**: 進入 **Step 5 (確認負責人接手)**
+    *   **If 通報失敗**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+### Step 5: 確認負責人接手
+*   **Description**: 輪詢 on-call 接手狀態，確認工程師於回應時間內接手工單。
+*   **System/Tool**: `oncall_ack_status` (API) (參數: `ticket_id`, `timeout_minutes`)
+*   **Branching**:
+    *   **If 負責人於時限內接手**: 轉移至 **移交負責人** (State: `hand_off_to_owner`)
+    *   **If 接手逾時**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
+
+---
+
+## End States
+
+### State: `hand_off_to_owner`
+*   **Action**: 紀錄已接手的負責人接續調查，將圍堵證據附加至工單，並關閉自動通報流程。
+
+### State: `escalate_to_equipment_engineering`
+*   **Action**: 彙整異常摘要、hold 狀態與工單資訊後升級設備工程，並以 `mcp__slack__post_message` (MCP) 於升級頻道通報。
+
+### State: `document_no_fault_found`
+*   **Action**: 紀錄誤報結論，釋放任何暫時 hold，並關閉調查。</script>
+
     <script>
         // Initialize Lucide Icons
         lucide.createIcons();
+
+        function loadApiMcpSample() {
+            const sample = document.getElementById('sample-api-mcp').textContent.trim();
+            document.getElementById('markdown-input').value = sample;
+            renderMarkdownPreview();
+            document.getElementById('log-text').textContent = '已載入 API + MCP 範例。點「編譯 SOP 為 Skill」即可轉換與模擬。';
+        }
 
         // Generated mock files data
         const generatedFiles = {
@@ -1140,6 +1224,13 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - 參數名稱應穩定且具語意，例如 \`tool_id\`、\`lot_ids\`、\`event_time\`、\`recipe_id\`。
 - 如果某步驟只是純判斷，沒有呼叫系統或工具，可以省略 \`System/Tool\`。
 
+## API 與 MCP 整合標註
+
+- 每個工具呼叫應標明整合方式：API 或 MCP。
+- **API**（內部系統 / REST API）：在工具名稱後加上 \`(API)\`，例如 \`mes_event_lookup\` (API)。
+- **MCP**（Model Context Protocol server tool）：加上 \`(MCP)\` / \`(MCP: server)\`，或使用 \`mcp__<server>__<tool>\` 命名慣例，例如 \`mcp__jira__create_issue\` (MCP)。
+- 若未標註，命名為 \`mcp__...\` 者視為 MCP，其餘有工具者一律視為 API。
+
 ## 品質檢查清單
 
 - SOP 有明確的起始步驟。
@@ -1255,6 +1346,31 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             document.getElementById('markdown-preview').classList.toggle('hidden', tabId !== 'markdown-preview');
         }
 
+        function detectToolMeta(toolName, annotationText) {
+            const text = annotationText || '';
+            let kind = null;
+            let server = null;
+            const mcpMarker = text.match(/\(\s*mcp(?:\s*:\s*([a-zA-Z0-9_.\-]+))?\s*\)/i);
+            const apiMarker = text.match(/\(\s*(?:rest\s+)?api\s*\)/i);
+            if (mcpMarker) {
+                kind = 'mcp';
+                if (mcpMarker[1]) server = mcpMarker[1];
+            } else if (apiMarker) {
+                kind = 'api';
+            } else if (toolName && toolName.toLowerCase().startsWith('mcp__')) {
+                kind = 'mcp';
+            } else if (toolName) {
+                kind = 'api';
+            }
+            if (kind === 'mcp' && !server && toolName) {
+                const parts = toolName.split('__');
+                if (parts.length >= 3 && parts[0].toLowerCase() === 'mcp') {
+                    server = parts[1];
+                }
+            }
+            return { kind, server };
+        }
+
         function makeStateId(title) {
             const stepMatch = title.match(/^Step\s+(\d+)/i);
             const normalized = title
@@ -1312,6 +1428,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 const id = makeStateId(titleLine);
                 let description = `Execute step: ${titleLine}`;
                 let tool = null;
+                let toolKind = null;
+                let mcpServer = null;
                 let parameters = null;
                 const nextStates = {};
 
@@ -1324,6 +1442,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         const codeMatches = [...trimmed.matchAll(/`([^`]+)`/g)].map(match => match[1]);
                         tool = codeMatches[0] || null;
                         parameters = codeMatches.length > 1 ? codeMatches.slice(1) : null;
+                        const meta = detectToolMeta(tool, trimmed);
+                        toolKind = meta.kind;
+                        mcpServer = meta.server;
                     }
                     const branch = trimmed.match(/\*\*If\s+([^:]+)\*\*:\s*(.+)$/i) || trimmed.match(/If\s+([^:]+):\s*(.+)$/i);
                     if (branch) {
@@ -1337,6 +1458,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     type: /check|evaluate/i.test(id) ? 'decision' : 'action',
                     description,
                     tool,
+                    tool_kind: toolKind,
+                    mcp_server: mcpServer,
                     parameters,
                     next_states: Object.keys(nextStates).length ? nextStates : null
                 });
@@ -1344,11 +1467,17 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             const endStateMatches = [...markdown.matchAll(/^###\s+State:\s*`([^`]+)`\s*\n\*\s+\*\*Action\*\*:\s*(.+)$/gm)];
             endStateMatches.forEach(match => {
+                const actionText = match[2].trim();
+                const toolMatch = actionText.match(/`([^`]+)`/);
+                const endTool = toolMatch ? toolMatch[1].trim() : null;
+                const meta = detectToolMeta(endTool, actionText);
                 states.push({
                     id: match[1].trim(),
                     type: 'end_state',
-                    description: `End state: ${match[2].trim()}`,
-                    tool: null,
+                    description: `End state: ${actionText}`,
+                    tool: endTool,
+                    tool_kind: meta.kind,
+                    mcp_server: meta.server,
                     parameters: null,
                     next_states: null
                 });
@@ -1416,7 +1545,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         }
 
         function buildSkillMarkdown(flow) {
-            const tools = [...new Set(flow.states.map(state => state.tool).filter(Boolean))].sort();
+            const apiTools = [...new Set(flow.states.filter(s => s.tool && s.tool_kind !== 'mcp').map(s => s.tool))].sort();
+            const mcpTools = [...new Map(flow.states
+                .filter(s => s.tool && s.tool_kind === 'mcp')
+                .map(s => [s.tool, s.mcp_server || ''])).entries()].sort((a, b) => a[0].localeCompare(b[0]));
             const skillName = flow.sop_name
                 .replace(/^SOP:\s*/i, '')
                 .toLowerCase()
@@ -1433,10 +1565,17 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             md += `2. Always begin execution at the state ID: \`${flow.start_state}\`.\n`;
             md += `3. Do not jump to subsequent states without verifying transition conditions.\n`;
             md += `4. Only use tools explicitly mapped to the current state.\n`;
-            md += `5. Treat states with type \`end_state\` as terminal states.\n\n`;
+            md += `5. Treat states with type \`end_state\` as terminal states.\n`;
+            md += `6. For \`mcp\` tools, invoke the named MCP server tool; for \`api\` tools, call the system/REST API.\n\n`;
 
-            if (tools.length) {
-                md += `## Tools Required\n\n${tools.map(tool => `- \`${tool}\``).join('\n')}\n\n`;
+            if (apiTools.length || mcpTools.length) {
+                md += `## Tools Required\n\n`;
+                if (apiTools.length) {
+                    md += `### API Tools\n\n${apiTools.map(tool => `- \`${tool}\``).join('\n')}\n\n`;
+                }
+                if (mcpTools.length) {
+                    md += `### MCP Tools\n\n${mcpTools.map(([tool, server]) => `- \`${tool}\`${server ? ` (server: \`${server}\`)` : ''}`).join('\n')}\n\n`;
+                }
             }
 
             md += `## State Map Reference\n\n`;
@@ -1446,6 +1585,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 if (state.tool) {
                     const params = state.parameters?.length ? ` (Parameters: ${state.parameters.join(', ')})` : '';
                     md += `- **Tool**: \`${state.tool}\`${params}\n`;
+                    if (state.tool_kind) {
+                        const serverNote = state.tool_kind === 'mcp' && state.mcp_server ? ` (server: \`${state.mcp_server}\`)` : '';
+                        md += `- **Integration**: \`${state.tool_kind.toUpperCase()}\`${serverNote}\n`;
+                    }
                 }
                 if (state.next_states && Object.keys(state.next_states).length) {
                     md += `- **Branching / Next States**:\n`;
@@ -1594,30 +1737,119 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             syncQualityReport(markdown);
         }
 
+        // Layered (Sugiyama-style) layout: rank nodes by longest-path depth from the
+        // start state, then reduce edge crossings with median/barycenter sweeps so the
+        // connecting lines no longer tangle across the whole diagram.
+        function computeFlowLayout(flow, dims) {
+            const { nodeWidth, nodeHeight, gapX, gapY, marginX, marginY } = dims;
+            const ids = flow.states.map(s => s.id);
+            const idSet = new Set(ids);
+            const start = (flow.start_state && idSet.has(flow.start_state)) ? flow.start_state : ids[0];
+
+            const outEdges = new Map(ids.map(id => [id, []]));
+            flow.states.forEach(s => {
+                Object.entries(s.next_states || {}).forEach(([condition, target]) => {
+                    if (idSet.has(target)) outEdges.get(s.id).push({ target, condition });
+                });
+            });
+
+            // 1. Detect back edges (cycle edges) via DFS so ranking works on a DAG.
+            const visitState = new Map(ids.map(id => [id, 0])); // 0=unseen, 1=on-stack, 2=done
+            const backEdges = new Set();
+            const finishOrder = [];
+            function dfs(u) {
+                visitState.set(u, 1);
+                outEdges.get(u).forEach(e => {
+                    if (visitState.get(e.target) === 0) dfs(e.target);
+                    else if (visitState.get(e.target) === 1) backEdges.add(`${u}->${e.target}`);
+                });
+                visitState.set(u, 2);
+                finishOrder.push(u);
+            }
+            if (start) dfs(start);
+            ids.forEach(id => { if (visitState.get(id) === 0) dfs(id); });
+
+            // 2. Longest-path ranking over forward edges (reverse finish order = topo order).
+            const topo = [...finishOrder].reverse();
+            const rank = new Map(ids.map(id => [id, 0]));
+            topo.forEach(u => {
+                outEdges.get(u).forEach(e => {
+                    if (backEdges.has(`${u}->${e.target}`)) return;
+                    if (rank.get(u) + 1 > rank.get(e.target)) rank.set(e.target, rank.get(u) + 1);
+                });
+            });
+
+            const maxRank = ids.reduce((m, id) => Math.max(m, rank.get(id)), 0);
+            const layers = Array.from({ length: maxRank + 1 }, () => []);
+            topo.forEach(id => layers[rank.get(id)].push(id));
+
+            // 3. Crossing reduction via median heuristic, sweeping down then up.
+            const succ = new Map(ids.map(id => [id, []]));
+            const pred = new Map(ids.map(id => [id, []]));
+            flow.states.forEach(s => {
+                outEdges.get(s.id).forEach(e => {
+                    if (backEdges.has(`${s.id}->${e.target}`)) return;
+                    succ.get(s.id).push(e.target);
+                    pred.get(e.target).push(s.id);
+                });
+            });
+            const pos = new Map();
+            const reindex = () => layers.forEach(layer => layer.forEach((id, i) => pos.set(id, i)));
+            reindex();
+            const median = neighbours => {
+                if (!neighbours.length) return -1;
+                const sorted = [...neighbours].sort((a, b) => a - b);
+                const m = Math.floor(sorted.length / 2);
+                return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+            };
+            const sortLayer = (layer, keyFn) => layer
+                .map((id, i) => ({ id, i, key: keyFn(id) }))
+                .map(item => (item.key < 0 ? { ...item, key: pos.get(item.id) } : item))
+                .sort((a, b) => (a.key - b.key) || (a.i - b.i))
+                .map(item => item.id);
+            for (let iter = 0; iter < 8; iter++) {
+                if (iter % 2 === 0) {
+                    for (let r = 1; r < layers.length; r++) {
+                        layers[r] = sortLayer(layers[r], id => median(pred.get(id).map(p => pos.get(p))));
+                        reindex();
+                    }
+                } else {
+                    for (let r = layers.length - 2; r >= 0; r--) {
+                        layers[r] = sortLayer(layers[r], id => median(succ.get(id).map(s => pos.get(s))));
+                        reindex();
+                    }
+                }
+            }
+
+            // 4. Assign coordinates, centering each layer.
+            const layerSpan = layer => layer.length * nodeWidth + Math.max(0, layer.length - 1) * gapX;
+            const maxSpan = layers.reduce((m, layer) => Math.max(m, layerSpan(layer)), nodeWidth);
+            const positions = new Map();
+            layers.forEach((layer, r) => {
+                const startX = marginX + (maxSpan - layerSpan(layer)) / 2;
+                layer.forEach((id, i) => {
+                    positions.set(id, {
+                        x: startX + i * (nodeWidth + gapX),
+                        y: marginY + r * (nodeHeight + gapY),
+                        rank: r
+                    });
+                });
+            });
+
+            const width = Math.max(920, maxSpan + marginX * 2);
+            const height = Math.max(420, layers.length * nodeHeight + Math.max(0, layers.length - 1) * gapY + marginY * 2);
+            return { positions, backEdges, width, height };
+        }
+
         function renderFlowFromGeneratedJson() {
             const flow = parseGeneratedFlow();
             const container = document.getElementById('flow-container');
             container.innerHTML = '';
 
             const svgNs = 'http://www.w3.org/2000/svg';
-            const nodeWidth = 240;
-            const nodeHeight = 92;
-            const gapX = 110;
-            const gapY = 108;
-            const columns = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(flow.states.length))));
-            const positions = new Map();
-            const width = Math.max(920, columns * nodeWidth + (columns - 1) * gapX + 80);
-            const rows = Math.ceil(flow.states.length / columns);
-            const height = Math.max(520, rows * nodeHeight + (rows - 1) * gapY + 90);
-
-            flow.states.forEach((state, index) => {
-                const row = Math.floor(index / columns);
-                const col = index % columns;
-                positions.set(state.id, {
-                    x: 40 + col * (nodeWidth + gapX),
-                    y: 40 + row * (nodeHeight + gapY)
-                });
-            });
+            const dims = { nodeWidth: 230, nodeHeight: 96, gapX: 56, gapY: 84, marginX: 48, marginY: 40 };
+            const { nodeWidth, nodeHeight } = dims;
+            const { positions, backEdges, width, height } = computeFlowLayout(flow, dims);
 
             const svg = document.createElementNS(svgNs, 'svg');
             svg.setAttribute('class', 'flow-svg');
@@ -1628,33 +1860,83 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const defs = document.createElementNS(svgNs, 'defs');
             defs.innerHTML = `
                 <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
-                    <path d="M 0 0 L 10 4 L 0 8 z" fill="rgba(156, 163, 175, 0.75)"></path>
+                    <path d="M 0 0 L 10 4 L 0 8 z" fill="rgba(156, 163, 175, 0.85)"></path>
+                </marker>
+                <marker id="arrowhead-back" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M 0 0 L 10 4 L 0 8 z" fill="rgba(245, 158, 11, 0.85)"></path>
                 </marker>
             `;
             svg.appendChild(defs);
 
+            // Pre-count outgoing/incoming forward edges per node to fan-out connection points.
+            const outCount = new Map();
+            const inCount = new Map();
             flow.states.forEach(state => {
                 const from = positions.get(state.id);
-                Object.entries(state.next_states || {}).forEach(([condition, target], index) => {
+                Object.entries(state.next_states || {}).forEach(([, target]) => {
+                    const to = positions.get(target);
+                    if (!to) return;
+                    const isBack = backEdges.has(`${state.id}->${target}`) || to.rank <= from.rank;
+                    if (isBack) return;
+                    outCount.set(state.id, (outCount.get(state.id) || 0) + 1);
+                    inCount.set(target, (inCount.get(target) || 0) + 1);
+                });
+            });
+            const outSeen = new Map();
+            const inSeen = new Map();
+            const fanOffset = (total, index, gap) => (index - (total - 1) / 2) * gap;
+
+            flow.states.forEach(state => {
+                const from = positions.get(state.id);
+                Object.entries(state.next_states || {}).forEach(([condition, target], branchIndex) => {
                     const to = positions.get(target);
                     if (!to) return;
 
-                    const x1 = from.x + nodeWidth;
-                    const y1 = from.y + nodeHeight / 2 + index * 8;
-                    const x2 = to.x;
-                    const y2 = to.y + nodeHeight / 2;
-                    const midX = (x1 + x2) / 2;
+                    const isBack = backEdges.has(`${state.id}->${target}`) || to.rank <= from.rank;
                     const path = document.createElementNS(svgNs, 'path');
-                    path.setAttribute('class', 'flow-edge');
-                    path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
-                    path.setAttribute('marker-end', 'url(#arrowhead)');
-                    svg.appendChild(path);
-
                     const label = document.createElementNS(svgNs, 'text');
-                    label.setAttribute('class', 'flow-edge-label');
-                    label.setAttribute('x', midX - 54);
-                    label.setAttribute('y', (y1 + y2) / 2 - 6 - index * 10);
-                    label.textContent = condition.length > 28 ? `${condition.slice(0, 25)}...` : condition;
+                    const shortLabel = condition.length > 26 ? `${condition.slice(0, 23)}...` : condition;
+
+                    if (!isBack) {
+                        const oTotal = outCount.get(state.id) || 1;
+                        const oIdx = outSeen.get(state.id) || 0;
+                        outSeen.set(state.id, oIdx + 1);
+                        const iTotal = inCount.get(target) || 1;
+                        const iIdx = inSeen.get(target) || 0;
+                        inSeen.set(target, iIdx + 1);
+
+                        const x1 = from.x + nodeWidth / 2 + fanOffset(oTotal, oIdx, Math.min(46, nodeWidth / (oTotal + 1)));
+                        const y1 = from.y + nodeHeight;
+                        const x2 = to.x + nodeWidth / 2 + fanOffset(iTotal, iIdx, Math.min(46, nodeWidth / (iTotal + 1)));
+                        const y2 = to.y;
+                        const dy = (y2 - y1) * 0.5;
+                        path.setAttribute('class', 'flow-edge');
+                        path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`);
+                        path.setAttribute('marker-end', 'url(#arrowhead)');
+
+                        label.setAttribute('class', 'flow-edge-label');
+                        label.setAttribute('text-anchor', 'middle');
+                        label.setAttribute('x', (x1 + x2) / 2);
+                        label.setAttribute('y', (y1 + y2) / 2 + (branchIndex % 2 === 0 ? -3 : 11));
+                    } else {
+                        // Route loop / back edges along the right margin so they bow clear of nodes.
+                        const x1 = from.x + nodeWidth;
+                        const y1 = from.y + nodeHeight / 2;
+                        const x2 = to.x + nodeWidth;
+                        const y2 = to.y + nodeHeight / 2;
+                        const bulge = Math.max(x1, x2) + 48 + branchIndex * 18;
+                        path.setAttribute('class', 'flow-edge back');
+                        path.setAttribute('d', `M ${x1} ${y1} C ${bulge} ${y1}, ${bulge} ${y2}, ${x2} ${y2}`);
+                        path.setAttribute('marker-end', 'url(#arrowhead-back)');
+
+                        label.setAttribute('class', 'flow-edge-label back');
+                        label.setAttribute('text-anchor', 'middle');
+                        label.setAttribute('x', bulge + 6);
+                        label.setAttribute('y', (y1 + y2) / 2);
+                    }
+
+                    label.textContent = shortLabel;
+                    svg.appendChild(path);
                     svg.appendChild(label);
                 });
             });
@@ -1662,20 +1944,33 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             flow.states.forEach(state => {
                 const pos = positions.get(state.id);
                 const group = document.createElementNS(svgNs, 'g');
-                const typeClass = state.type === 'end_state' ? 'end' : state.type;
                 const typeColor = state.type === 'decision' ? 'var(--accent)' : state.type === 'end_state' ? 'var(--green)' : 'var(--secondary)';
                 group.setAttribute('class', 'flow-svg-node');
                 group.dataset.nodeId = state.id;
                 group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
 
-                const title = state.id.length > 26 ? `${state.id.slice(0, 23)}...` : state.id;
+                const title = state.id.length > 24 ? `${state.id.slice(0, 21)}...` : state.id;
                 const tool = state.tool ? `tool: ${state.tool}` : state.type === 'end_state' ? 'terminal state' : 'no tool';
-                const toolText = tool.length > 32 ? `${tool.slice(0, 29)}...` : tool;
+                const toolText = tool.length > 30 ? `${tool.slice(0, 27)}...` : tool;
+
+                let kindBadge = '';
+                if (state.tool_kind) {
+                    const kindLabel = state.tool_kind.toUpperCase();
+                    const kindColor = state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)';
+                    const badgeWidth = kindLabel.length * 7 + 14;
+                    const badgeX = nodeWidth - badgeWidth - 12;
+                    kindBadge = `
+                        <rect x="${badgeX}" y="12" width="${badgeWidth}" height="18" rx="9" fill="rgba(255,255,255,0.04)" stroke="${kindColor}" stroke-width="1"></rect>
+                        <text class="flow-node-kind" x="${badgeX + badgeWidth / 2}" y="24.5" text-anchor="middle" fill="${kindColor}">${kindLabel}</text>
+                    `;
+                }
+
                 group.innerHTML = `
                     <rect width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
-                    <text class="flow-node-type" x="16" y="22" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
-                    <text class="flow-node-title" x="16" y="48">${escapeHtml(title)}</text>
-                    <text class="flow-node-tool" x="16" y="72">${escapeHtml(toolText)}</text>
+                    <text class="flow-node-type" x="16" y="24" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
+                    ${kindBadge}
+                    <text class="flow-node-title" x="16" y="52">${escapeHtml(title)}</text>
+                    <text class="flow-node-tool" x="16" y="76">${escapeHtml(toolText)}</text>
                 `;
                 group.addEventListener('click', () => inspectNode(state.id, group));
                 svg.appendChild(group);
@@ -1706,6 +2001,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         <div class="inspector-item">
                             <div class="inspector-label">關聯工具 (System Tool)</div>
                             <div class="inspector-val"><code>${escapeHtml(state.tool || 'None')}</code></div>
+                        </div>
+                        <div class="inspector-item">
+                            <div class="inspector-label">整合方式 (Integration)</div>
+                            <div class="inspector-val" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : state.tool_kind === 'api' ? 'var(--secondary)' : 'var(--text-muted)'}">${state.tool_kind ? escapeHtml(state.tool_kind.toUpperCase()) : 'None'}${state.tool_kind === 'mcp' && state.mcp_server ? ` · <code>${escapeHtml(state.mcp_server)}</code>` : ''}</div>
                         </div>
                         <div class="inspector-item" style="grid-column: span 2">
                             <div class="inspector-label">節點敘述</div>
@@ -1771,6 +2070,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 <div class="sim-state-meta">
                     <span class="sim-pill">${escapeHtml(state.type)}</span>
                     <span class="sim-pill">tool: ${escapeHtml(state.tool || 'None')}</span>
+                    ${state.tool_kind ? `<span class="sim-pill" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)'}; border-color: ${state.tool_kind === 'mcp' ? 'rgba(217,70,239,0.4)' : 'rgba(79,172,254,0.4)'}">${escapeHtml(state.tool_kind.toUpperCase())}${state.tool_kind === 'mcp' && state.mcp_server ? ` · ${escapeHtml(state.mcp_server)}` : ''}</span>` : ''}
                     <span class="sim-pill">params: ${escapeHtml(params)}</span>
                 </div>
                 <p style="color: var(--text-muted);">${escapeHtml(state.description)}</p>

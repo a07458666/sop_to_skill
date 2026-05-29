@@ -21,6 +21,43 @@ def escape_frontmatter_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def detect_tool_meta(tool_name: Optional[str], annotation_text: str = ""):
+    """
+    Classify a tool reference as an API or MCP integration.
+
+    Detection order:
+    1. Explicit ``(MCP)`` / ``(MCP: server)`` annotation -> mcp.
+    2. Explicit ``(API)`` / ``(REST API)`` annotation -> api.
+    3. ``mcp__<server>__<tool>`` naming convention -> mcp.
+    4. Any other named tool -> api.
+    Returns ``(tool_kind, mcp_server)`` where either may be ``None``.
+    """
+    text = annotation_text or ""
+    kind = None
+    server = None
+
+    mcp_marker = re.search(r"\(\s*mcp(?:\s*:\s*([a-zA-Z0-9_.\-]+))?\s*\)", text, re.IGNORECASE)
+    api_marker = re.search(r"\(\s*(?:rest\s+)?api\s*\)", text, re.IGNORECASE)
+
+    if mcp_marker:
+        kind = "mcp"
+        if mcp_marker.group(1):
+            server = mcp_marker.group(1)
+    elif api_marker:
+        kind = "api"
+    elif tool_name and tool_name.lower().startswith("mcp__"):
+        kind = "mcp"
+    elif tool_name:
+        kind = "api"
+
+    if kind == "mcp" and not server and tool_name:
+        parts = tool_name.split("__")
+        if len(parts) >= 3 and parts[0].lower() == "mcp":
+            server = parts[1]
+
+    return kind, server
+
+
 # 1. Define the Pydantic schemas for Structured Output
 class State(BaseModel):
     id: str = Field(
@@ -35,6 +72,14 @@ class State(BaseModel):
     tool: Optional[str] = Field(
         default=None,
         description="Name of the API or tool/system invoked in this state, if any."
+    )
+    tool_kind: Optional[str] = Field(
+        default=None,
+        description="Integration kind for the tool: 'api' (REST/internal system API), 'mcp' (Model Context Protocol server tool), or null when the step calls no external tool."
+    )
+    mcp_server: Optional[str] = Field(
+        default=None,
+        description="For MCP tools, the MCP server name (e.g. 'github', 'slack', 'jira'). Null for API tools or pure decisions."
     )
     parameters: Optional[List[str]] = Field(
         default=None,
@@ -237,6 +282,8 @@ def offline_fallback_parse(content: str) -> dict:
 
         description = ""
         tool = None
+        tool_kind = None
+        mcp_server = None
         params = []
         next_states = {}
 
@@ -247,14 +294,16 @@ def offline_fallback_parse(content: str) -> dict:
                 description = line_str.split(":", 1)[1].strip()
             elif line_str.startswith("*   **System/Tool**:") or line_str.startswith("-   **System/Tool**:"):
                 tool_part = line_str.split(":", 1)[1].strip()
-                # Parse e.g., `mes_event_lookup` (Parameters: `tool_id`, `event_time`)
+                # Parse e.g., `mes_event_lookup` (API) (Parameters: `tool_id`, `event_time`)
                 tool_match = re.search(r"`([^`]+)`", tool_part)
                 if tool_match:
                     tool = tool_match.group(1)
-                
+
                 param_matches = re.findall(r"`([^`]+)`", tool_part)
                 if len(param_matches) > 1:
                     params = param_matches[1:]
+
+                tool_kind, mcp_server = detect_tool_meta(tool, tool_part)
             elif "If " in line_str:
                 # Basic parsing for branching conditions
                 cond_match = re.search(r"\*\*If\s+([^:]+)\*\*:\s*(.+)", line_str)
@@ -275,6 +324,8 @@ def offline_fallback_parse(content: str) -> dict:
             "type": state_type,
             "description": description,
             "tool": tool,
+            "tool_kind": tool_kind,
+            "mcp_server": mcp_server,
             "parameters": params if params else None,
             "next_states": next_states if next_states else None
         })
@@ -287,12 +338,15 @@ def offline_fallback_parse(content: str) -> dict:
         
         tool_match = re.search(r"`([^`]+)`", action_text)
         tool = tool_match.group(1) if tool_match else None
-        
+        tool_kind, mcp_server = detect_tool_meta(tool, action_text)
+
         states.append({
             "id": state_id,
             "type": "end_state",
             "description": f"End state: {action_text}",
             "tool": tool,
+            "tool_kind": tool_kind,
+            "mcp_server": mcp_server,
             "parameters": None,
             "next_states": None
         })
@@ -319,7 +373,10 @@ def generate_skill_md(flow_data: StateMachine) -> str:
     Generates a valid SKILL.md entrypoint based on the parsed flow data.
     """
     skill_name = slugify_skill_name(flow_data.sop_name)
-    tools_required = sorted(list({s.tool for s in flow_data.states if s.tool}))
+    api_tools = sorted({s.tool for s in flow_data.states if s.tool and s.tool_kind != "mcp"})
+    mcp_states = sorted(
+        {(s.tool, s.mcp_server or "") for s in flow_data.states if s.tool and s.tool_kind == "mcp"}
+    )
     description = (
         f"Use when executing the SOP workflow for {flow_data.sop_name}. "
         "Follow the bundled flow.json state machine for deterministic routing, tool calls, "
@@ -339,13 +396,22 @@ def generate_skill_md(flow_data: StateMachine) -> str:
     instructions += "2. Always begin execution at the state ID: `{}`.\n".format(flow_data.start_state)
     instructions += "3. Do not jump to subsequent states without verifying transition conditions.\n"
     instructions += "4. Only use tools explicitly mapped to the current state.\n"
-    instructions += "5. Treat states with type `end_state` as terminal states.\n\n"
-    if tools_required:
+    instructions += "5. Treat states with type `end_state` as terminal states.\n"
+    instructions += "6. For `mcp` tools, invoke the named MCP server tool; for `api` tools, call the system/REST API.\n\n"
+    if api_tools or mcp_states:
         instructions += "## Tools Required\n\n"
-        for tool in tools_required:
-            instructions += f"- `{tool}`\n"
-        instructions += "\n"
-    
+        if api_tools:
+            instructions += "### API Tools\n\n"
+            for tool in api_tools:
+                instructions += f"- `{tool}`\n"
+            instructions += "\n"
+        if mcp_states:
+            instructions += "### MCP Tools\n\n"
+            for tool, server in mcp_states:
+                server_note = f" (server: `{server}`)" if server else ""
+                instructions += f"- `{tool}`{server_note}\n"
+            instructions += "\n"
+
     instructions += "## State Map Reference\n\n"
     for s in flow_data.states:
         instructions += "### State: `{}` (Type: `{}`)\n".format(s.id, s.type)
@@ -355,6 +421,11 @@ def generate_skill_md(flow_data: StateMachine) -> str:
             if s.parameters:
                 instructions += f" (Parameters: {', '.join(s.parameters)})"
             instructions += "\n"
+            if s.tool_kind:
+                integration = f"- **Integration**: `{s.tool_kind.upper()}`"
+                if s.tool_kind == "mcp" and s.mcp_server:
+                    integration += f" (server: `{s.mcp_server}`)"
+                instructions += integration + "\n"
         if s.next_states:
             instructions += "- **Branching / Next States**:\n"
             for cond, target in s.next_states.items():
@@ -444,6 +515,8 @@ Extract all states, transitions, tools, parameters, and ensure that:
 2. The `start_state` points to a valid state ID.
 3. Decision states have explicit branching conditions (e.g., 'true'/'false', or 'success'/'failure', or range conditions like '<=100' / '>100').
 4. Terminal/end states have `next_states` set to null or empty.
+5. For each tool, set `tool_kind` to 'mcp' when the SOP marks it with `(MCP)` / `(MCP: server)` or the tool name uses the `mcp__<server>__<tool>` convention; otherwise set it to 'api'. Leave `tool_kind` null for pure decision states with no tool.
+6. For MCP tools, set `mcp_server` to the server name (e.g. the segment between `mcp__` and the next `__`, or the value given in `(MCP: server)`). Leave `mcp_server` null for API tools.
 """
 
             response = client.models.generate_content(

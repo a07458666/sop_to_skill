@@ -37,6 +37,17 @@
 - 參數名稱應穩定且具語意，例如 `tool_id`、`lot_ids`、`event_time`、`recipe_id`。
 - 如果某步驟只是純判斷，沒有呼叫系統或工具，可以省略 `System/Tool`。
 
+## API 與 MCP 整合標註
+
+- 每個工具呼叫應標明整合方式：API 或 MCP。
+- **API**（內部系統 / REST API）：在工具名稱後加上 `(API)`。
+  - 範例：`**System/Tool**: \`mes_event_lookup\` (API) (參數: \`tool_id\`, \`event_time\`)`
+- **MCP**（Model Context Protocol server tool）：在工具名稱後加上 `(MCP)`，或直接用 `mcp__<server>__<tool>` 命名慣例。
+  - 範例：`**System/Tool**: \`mcp__jira__create_issue\` (MCP) (參數: \`project_key\`, \`summary\`)`
+  - 也可用 `(MCP: jira)` 明確指定 MCP server 名稱。
+- 若未標註，命名為 `mcp__...` 者視為 MCP，其餘有工具者一律視為 API。
+- MCP server 名稱會由 `mcp__<server>__<tool>` 中間段或 `(MCP: server)` 推導，供 Agent 知道要載入哪一個 MCP server。
+
 ## 品質檢查清單
 
 - SOP 有明確的起始步驟。

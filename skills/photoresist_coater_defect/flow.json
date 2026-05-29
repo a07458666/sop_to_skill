@@ -7,6 +7,8 @@
       "type": "action",
       "description": "Review inspection image, defect map, metrology result, and operator report to confirm a coating-related defect.",
       "tool": "inspection_result_lookup",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "lot_id",
         "inspection_time"
@@ -21,6 +23,8 @@
       "type": "action",
       "description": "Put the coater module on engineering hold and hold affected lots for engineering disposition.",
       "tool": "containment_hold_request",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "lot_ids",
@@ -36,6 +40,8 @@
       "type": "action",
       "description": "Review dispense pressure, spin speed, nozzle status, resist bottle lot, exhaust, and bake plate temperature.",
       "tool": "coater_process_data_review",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "lot_ids",
@@ -51,6 +57,8 @@
       "type": "action",
       "description": "Inspect dispense nozzle, pump calibration, cup cleanliness, track exhaust, and bake plate condition.",
       "tool": "coater_diagnostics",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "module_id"
@@ -65,6 +73,8 @@
       "type": "action",
       "description": "Check resist bottle lot, expiration date, storage condition, filter change record, and chemical dispense history.",
       "tool": "material_history_review",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "material_lot_id",
         "tool_id"
@@ -79,6 +89,8 @@
       "type": "action",
       "description": "Define cleaning, calibration, part replacement, or recipe correction action and assign an owner.",
       "tool": "corrective_action_create",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "root_cause",
@@ -94,6 +106,8 @@
       "type": "action",
       "description": "Run monitor wafer coating test, review defect scan, and confirm thickness uniformity.",
       "tool": "coater_recovery_verify",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "qualification_plan"
@@ -108,6 +122,8 @@
       "type": "end_state",
       "description": "End state: Release tool and lots according to engineering disposition, then notify manufacturing.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -116,6 +132,8 @@
       "type": "end_state",
       "description": "End state: Open MRB case for affected material or lots and notify quality and process owners.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -124,6 +142,8 @@
       "type": "end_state",
       "description": "End state: Escalate with defect evidence, process data, material history, and containment status.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -132,6 +152,8 @@
       "type": "end_state",
       "description": "End state: Escalate containment failure to the manufacturing shift lead.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -140,6 +162,8 @@
       "type": "end_state",
       "description": "End state: Route the event to the responsible non-coating process owner with evidence attached.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     }
