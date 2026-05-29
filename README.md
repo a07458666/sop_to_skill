@@ -53,6 +53,26 @@ The detected `tool_kind` and `mcp_server` are written into `flow.json`, grouped 
 `## Tools Required` in `SKILL.md`, and surfaced in the web visualizer and execution simulator.
 See `sop_rule.md` for the full authoring rules.
 
+### Integration validation & response interpretation
+
+`sop_quality_report.md` now includes an **`## API / MCP 整合驗證`** table that validates,
+per tool state: the parameter contract (does the agent know what to send?), the number of
+distinguishable response branches (can the agent route on the result?), and — for MCP tools —
+that an `mcp_server` could be resolved (so it can be mounted). It also lists the MCP servers
+that must be mounted before execution.
+
+Each tool state's branch conditions act as the agent's **response-interpretation rules**:
+
+- **API**: verify the HTTP `status` (non-2xx ⇒ failure branch), then read `body.result`
+  and match it against the state's branch conditions.
+- **MCP**: check the `isError` flag, then read `structuredContent.outcome` and match it
+  against the branch conditions.
+
+The web demo (`index.html`) makes this interactive: a **MCP Server 掛載** panel lets you
+mount/unmount the servers referenced by the SOP (MCP tool calls are blocked until mounted),
+and the **execution simulator** shows the simulated request payload, the verification rule,
+and the mock API/MCP response for each routing choice.
+
 ## Example SOPs
 
 - `sample_sop.md`: semiconductor tool fault investigation.
