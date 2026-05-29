@@ -7,6 +7,8 @@
       "type": "action",
       "description": "Review furnace alarm history, recipe setpoint, actual temperature trace, and event timestamp to confirm the drift condition.",
       "tool": "furnace_alarm_lookup",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "event_time"
@@ -21,6 +23,8 @@
       "type": "action",
       "description": "Stop new lots from entering the furnace and place the equipment under engineering hold.",
       "tool": "tool_hold_request",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "hold_reason"
@@ -35,6 +39,8 @@
       "type": "action",
       "description": "Query lot history to identify wafers processed during the temperature drift window.",
       "tool": "lot_history_query",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "event_time",
@@ -50,6 +56,8 @@
       "type": "action",
       "description": "Review film thickness, uniformity, oxide growth rate, and SPC trends for exposed lots.",
       "tool": "metrology_review",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "lot_ids",
         "measurement_type"
@@ -64,6 +72,8 @@
       "type": "action",
       "description": "Check thermocouple calibration, heater zone status, gas flow stability, and controller logs.",
       "tool": "furnace_diagnostics",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "zone_id"
@@ -78,6 +88,8 @@
       "type": "action",
       "description": "Define repair action, post-maintenance qualification, owner, and release criteria.",
       "tool": "corrective_action_create",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "root_cause",
@@ -93,6 +105,8 @@
       "type": "action",
       "description": "Run qualification recipe and confirm temperature stability before production release.",
       "tool": "tool_recovery_verify",
+      "tool_kind": "api",
+      "mcp_server": null,
       "parameters": [
         "tool_id",
         "qualification_plan"
@@ -107,6 +121,8 @@
       "type": "end_state",
       "description": "End state: Remove engineering hold, attach recovery evidence, and notify manufacturing that the furnace is released.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -115,6 +131,8 @@
       "type": "end_state",
       "description": "End state: Open a Material Review Board case for exposed lots and notify process engineering and quality owners.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -123,6 +141,8 @@
       "type": "end_state",
       "description": "End state: Escalate with alarm records, lot exposure, diagnostic evidence, and current containment status.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     },
@@ -131,6 +151,8 @@
       "type": "end_state",
       "description": "End state: Record no-fault finding, close the event, and notify the shift owner.",
       "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
       "parameters": null,
       "next_states": null
     }

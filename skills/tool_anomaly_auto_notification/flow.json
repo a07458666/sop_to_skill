@@ -1,0 +1,117 @@
+{
+  "sop_name": "SOP: Tool Anomaly Auto-Notification and Ticket Procedure",
+  "start_state": "detect_anomaly_event",
+  "states": [
+    {
+      "id": "detect_anomaly_event",
+      "type": "action",
+      "description": "Review the tool alarm, MES event, and timestamp to confirm a real anomaly occurred rather than a duplicate or false alarm.",
+      "tool": "mes_event_lookup",
+      "tool_kind": "api",
+      "mcp_server": null,
+      "parameters": [
+        "tool_id",
+        "event_time"
+      ],
+      "next_states": {
+        "anomaly is confirmed": "place_tool_on_hold",
+        "event is a false alarm": "document_no_fault_found"
+      }
+    },
+    {
+      "id": "place_tool_on_hold",
+      "type": "action",
+      "description": "Stop new wafer starts and place the affected tool under engineering hold through the equipment automation API.",
+      "tool": "eap_tool_hold",
+      "tool_kind": "api",
+      "mcp_server": null,
+      "parameters": [
+        "tool_id",
+        "hold_reason"
+      ],
+      "next_states": {
+        "hold is applied successfully": "create_tracking_ticket",
+        "hold cannot be applied": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "create_tracking_ticket",
+      "type": "action",
+      "description": "Open a tracking ticket for the anomaly so the investigation has an auditable record and an owner.",
+      "tool": "mcp__jira__create_issue",
+      "tool_kind": "mcp",
+      "mcp_server": "jira",
+      "parameters": [
+        "project_key",
+        "summary",
+        "severity"
+      ],
+      "next_states": {
+        "ticket is created": "notify_oncall_owner",
+        "ticket creation fails": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "notify_oncall_owner",
+      "type": "action",
+      "description": "Post the anomaly summary and ticket link to the equipment on-call channel so the responsible engineer is paged.",
+      "tool": "mcp__slack__post_message",
+      "tool_kind": "mcp",
+      "mcp_server": "slack",
+      "parameters": [
+        "channel",
+        "message"
+      ],
+      "next_states": {
+        "notification is delivered": "confirm_owner_acknowledgement",
+        "notification fails": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "confirm_owner_acknowledgement",
+      "type": "action",
+      "description": "Poll the on-call acknowledgement status to confirm the engineer has accepted ownership of the ticket within the response window.",
+      "tool": "oncall_ack_status",
+      "tool_kind": "api",
+      "mcp_server": null,
+      "parameters": [
+        "ticket_id",
+        "timeout_minutes"
+      ],
+      "next_states": {
+        "owner acknowledges in time": "hand_off_to_owner",
+        "acknowledgement times out": "escalate_to_equipment_engineering"
+      }
+    },
+    {
+      "id": "hand_off_to_owner",
+      "type": "end_state",
+      "description": "End state: Record that the acknowledged owner now drives the investigation, attach containment evidence to the ticket, and close the auto-notification flow.",
+      "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "escalate_to_equipment_engineering",
+      "type": "end_state",
+      "description": "End state: Escalate to equipment engineering with the anomaly summary, hold status, and ticket reference using `mcp__slack__post_message` (MCP) on the escalation channel.",
+      "tool": "mcp__slack__post_message",
+      "tool_kind": "mcp",
+      "mcp_server": "slack",
+      "parameters": null,
+      "next_states": null
+    },
+    {
+      "id": "document_no_fault_found",
+      "type": "end_state",
+      "description": "End state: Record the false alarm finding, release any temporary hold, and close the investigation.",
+      "tool": null,
+      "tool_kind": null,
+      "mcp_server": null,
+      "parameters": null,
+      "next_states": null
+    }
+  ]
+}
