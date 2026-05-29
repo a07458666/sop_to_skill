@@ -521,6 +521,12 @@
             font-size: 10px;
         }
 
+        .flow-node-returns {
+            fill: #6b7280;
+            font-family: 'Fira Code', monospace;
+            font-size: 9.5px;
+        }
+
         /* Detail Inspector Card */
         .inspector-panel {
             background: rgba(0,0,0,0.25);
@@ -883,6 +889,96 @@
             color: var(--text-muted);
         }
 
+        .sim-hist-call {
+            margin-top: 6px;
+            border-left: 2px solid rgba(0, 242, 254, 0.3);
+            padding-left: 10px;
+        }
+
+        .sim-hist-data {
+            margin: 6px 0;
+            padding: 8px 10px;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.74rem;
+            color: #a7f3d0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .sim-hist-interp {
+            font-size: 0.82rem;
+            color: var(--text-main);
+        }
+
+        .sim-hist-interp code {
+            font-family: 'Fira Code', monospace;
+            color: var(--primary);
+            background: rgba(0,0,0,0.3);
+            padding: 1px 4px;
+            border-radius: 4px;
+        }
+
+        /* Advertised tool schema inside the mount panel */
+        .mcp-tool-detail {
+            margin-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 8px;
+        }
+
+        .mcp-tool-detail summary {
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.76rem;
+            color: var(--text-main);
+        }
+
+        .mcp-tool-detail .mcp-tool-desc {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin: 6px 0;
+        }
+
+        .mcp-io-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin: 6px 0 4px;
+        }
+
+        /* Flow legend */
+        .flow-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 14px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .flow-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .flow-legend .swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .flow-legend .swatch.line {
+            width: 18px;
+            height: 0;
+            border-radius: 0;
+            border-top: 2px solid var(--amber);
+        }
+
         .section-title-row {
             display: flex;
             align-items: center;
@@ -1133,8 +1229,16 @@
         <!-- Interactive Flowchart Visualizer -->
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API、調用參數」與「條件路由跳轉邏輯」。</p>
-            
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API / MCP、調用參數、回傳判讀」與「條件路由跳轉邏輯」。</p>
+
+            <div class="flow-legend">
+                <span><span class="swatch" style="background: var(--secondary);"></span> API action（REST 查詢）</span>
+                <span><span class="swatch" style="background: var(--accent);"></span> MCP action（MCP server 工具）</span>
+                <span><span class="swatch" style="background: var(--accent); opacity:0.55;"></span> Decision（純判斷）</span>
+                <span><span class="swatch" style="background: var(--green);"></span> End state（終點）</span>
+                <span><span class="swatch line"></span> 迴圈 / 回邊 (loop)</span>
+            </div>
+
             <div class="flow-container" id="flow-container"></div>
 
             <!-- Inspector Panel -->
@@ -2090,7 +2194,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             container.innerHTML = '';
 
             const svgNs = 'http://www.w3.org/2000/svg';
-            const dims = { nodeWidth: 230, nodeHeight: 96, gapX: 56, gapY: 84, marginX: 48, marginY: 40 };
+            const dims = { nodeWidth: 246, nodeHeight: 116, gapX: 60, gapY: 90, marginX: 48, marginY: 40 };
             const { nodeWidth, nodeHeight } = dims;
             const { positions, backEdges, width, height } = computeFlowLayout(flow, dims);
 
@@ -2192,9 +2296,27 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 group.dataset.nodeId = state.id;
                 group.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
 
-                const title = state.id.length > 24 ? `${state.id.slice(0, 21)}...` : state.id;
-                const tool = state.tool ? `tool: ${state.tool}` : state.type === 'end_state' ? 'terminal state' : 'no tool';
-                const toolText = tool.length > 30 ? `${tool.slice(0, 27)}...` : tool;
+                const truncate = (text, max) => text.length > max ? `${text.slice(0, max - 1)}…` : text;
+                const title = truncate(state.id, 24);
+
+                // Clear transport line + returned-field preview to make API/MCP flow legible.
+                const contract = buildToolContract(state);
+                const spec = getToolSpec(state);
+                let transportText;
+                let returnsText = '';
+                if (state.tool && contract) {
+                    if (contract.transport === 'MCP') {
+                        const shortTool = state.tool.split('__').pop();
+                        transportText = `MCP · ${state.mcp_server || '?'}/${shortTool}`;
+                    } else {
+                        transportText = `API · ${contract.method} /api/${state.tool}`;
+                    }
+                    if (spec && spec.outputs && spec.outputs.length) {
+                        returnsText = `↩ returns: ${spec.outputs.slice(0, 3).map(out => out[0]).join(', ')}`;
+                    }
+                } else {
+                    transportText = state.type === 'end_state' ? 'terminal state' : 'decision · no tool';
+                }
 
                 let kindBadge = '';
                 if (state.tool_kind) {
@@ -2203,17 +2325,19 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     const badgeWidth = kindLabel.length * 7 + 14;
                     const badgeX = nodeWidth - badgeWidth - 12;
                     kindBadge = `
-                        <rect x="${badgeX}" y="12" width="${badgeWidth}" height="18" rx="9" fill="rgba(255,255,255,0.04)" stroke="${kindColor}" stroke-width="1"></rect>
-                        <text class="flow-node-kind" x="${badgeX + badgeWidth / 2}" y="24.5" text-anchor="middle" fill="${kindColor}">${kindLabel}</text>
+                        <rect x="${badgeX}" y="13" width="${badgeWidth}" height="18" rx="9" fill="rgba(255,255,255,0.04)" stroke="${kindColor}" stroke-width="1"></rect>
+                        <text class="flow-node-kind" x="${badgeX + badgeWidth / 2}" y="25.5" text-anchor="middle" fill="${kindColor}">${kindLabel}</text>
                     `;
                 }
 
                 group.innerHTML = `
                     <rect width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
-                    <text class="flow-node-type" x="16" y="24" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
+                    <rect width="5" height="${nodeHeight}" rx="2" fill="${typeColor}" opacity="0.9"></rect>
+                    <text class="flow-node-type" x="20" y="25" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
                     ${kindBadge}
-                    <text class="flow-node-title" x="16" y="52">${escapeHtml(title)}</text>
-                    <text class="flow-node-tool" x="16" y="76">${escapeHtml(toolText)}</text>
+                    <text class="flow-node-title" x="20" y="54">${escapeHtml(title)}</text>
+                    <text class="flow-node-tool" x="20" y="80">${escapeHtml(truncate(transportText, 32))}</text>
+                    ${returnsText ? `<text class="flow-node-returns" x="20" y="100">${escapeHtml(truncate(returnsText, 34))}</text>` : ''}
                 `;
                 group.addEventListener('click', () => inspectNode(state.id, group));
                 svg.appendChild(group);
@@ -2229,6 +2353,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const flow = parseGeneratedFlow();
             const state = flow.states.find(item => item.id === nodeId);
             const contract = buildToolContract(state);
+            const spec = state.tool ? getToolSpec(state) : null;
             const transitions = state.next_states && Object.keys(state.next_states).length
                 ? `<ul>${Object.entries(state.next_states).map(([condition, target]) => `<li><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}</li>`).join('')}</ul>`
                 : 'None (Terminal state)';
@@ -2262,6 +2387,15 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                             <div class="inspector-label">下一步跳轉路由</div>
                             <div class="inspector-val">${transitions}</div>
                         </div>
+                        ${spec ? `
+                        <div class="inspector-item" style="grid-column: span 2">
+                            <div class="inspector-label">工具 I/O Schema · 回傳數值欄位 (Output)</div>
+                            <div class="inspector-val" style="font-size:0.86rem;">
+                                <div style="color: var(--text-muted); margin-bottom:4px;">${escapeHtml(spec.description || '')}</div>
+                                <div style="margin:4px 0;"><span style="color: var(--text-muted);">input:</span> <code>${escapeHtml(spec.inputs.map(io => io[0] + ':' + io[1]).join(', ') || 'None')}</code></div>
+                                <div><span style="color: var(--text-muted);">output:</span> <code>${escapeHtml(spec.outputs.map(io => io[0] + ':' + io[1]).join(', '))}</code></div>
+                            </div>
+                        </div>` : ''}
                         ${contract ? `
                         <div class="inspector-item" style="grid-column: span 2">
                             <div class="inspector-label">回傳判讀 (Response Verification)</div>
@@ -2281,16 +2415,194 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
         // Heuristic: does a branch condition describe a failure / negative outcome?
         function isFailureOutcome(condition) {
-            return /(fail|reject|error|timeout|invalid|cannot|unable|denied|missing|false|not |no |逾時|失敗|駁回|無法|未|錯誤|拒絕|否)/i.test(condition);
+            return /(fail|reject|error|timeout|times?\s*out|timed\s*out|expire|exceed|invalid|cannot|unable|denied|missing|false|not |no |逾時|失敗|駁回|無法|未|錯誤|拒絕|否|誤報|重複)/i.test(condition);
         }
 
         function guessHttpMethod(toolName) {
             return /(lookup|get|query|status|read|list|fetch|check|review|verify)/i.test(toolName || '') ? 'GET' : 'POST';
         }
 
+        // Simulated tool catalog. Like the schema an MCP server advertises (description +
+        // input/output), each tool behaves like a SQL query that returns wafer/tool values.
+        // `rows(ok)` is the fetched dataset and `interpret(ok)` is how the agent reads those
+        // values to choose the next state. Tools not listed fall back to a generic spec.
+        const toolCatalog = {
+            mes_event_lookup: {
+                description: '查詢 MES event store，回傳指定機台在時間窗內的 alarm / event 紀錄。',
+                inputs: [['tool_id', 'string'], ['event_time', 'timestamp']],
+                outputs: [['event_id', 'string'], ['alarm_code', 'string'], ['event_count', 'int'], ['is_duplicate', 'bool'], ['severity', 'enum']],
+                rows: ok => ok
+                    ? { event_id: 'EVT-83910', alarm_code: 'ALM-204', event_count: 3, is_duplicate: false, severity: 'major' }
+                    : { event_id: 'EVT-83911', alarm_code: 'ALM-000', event_count: 1, is_duplicate: true, severity: 'info' },
+                interpret: ok => ok
+                    ? '`event_count=3`、`is_duplicate=false`、`severity=major` ⇒ 確認為真實故障事件'
+                    : '`is_duplicate=true`、`severity=info` ⇒ 判定為重複事件 / 誤報'
+            },
+            tool_hold_request: {
+                description: '對機台送出 engineering hold 請求，回傳套用後的設備狀態。',
+                inputs: [['tool_id', 'string'], ['hold_reason', 'string']],
+                outputs: [['hold_id', 'string'], ['applied', 'bool'], ['eqp_state', 'enum']],
+                rows: ok => ok
+                    ? { hold_id: 'HOLD-5521', applied: true, eqp_state: 'DOWN' }
+                    : { hold_id: null, applied: false, eqp_state: 'RUN', error: 'PERMISSION_DENIED' },
+                interpret: ok => ok
+                    ? '`applied=true`、`eqp_state=DOWN` ⇒ hold 套用成功'
+                    : '`applied=false`（PERMISSION_DENIED） ⇒ 無法套用 hold，需升級'
+            },
+            lot_history_query: {
+                description: '以 SQL 查詢 lot history，回傳故障時間窗內經過此機台的批次。',
+                inputs: [['tool_id', 'string'], ['event_time', 'timestamp'], ['lookback_hours', 'int']],
+                outputs: [['exposed_lot_count', 'int'], ['lot_ids', 'string[]'], ['wafer_count', 'int'], ['window', 'string']],
+                rows: ok => ok
+                    ? { exposed_lot_count: 4, lot_ids: ['LOT2391', 'LOT2392', 'LOT2393', 'LOT2401'], wafer_count: 98, window: '2026-05-28 02:10~04:35' }
+                    : { exposed_lot_count: 0, lot_ids: [], wafer_count: 0, window: '2026-05-28 02:10~04:35' },
+                interpret: ok => ok
+                    ? '`exposed_lot_count=4 > 0` ⇒ 有受影響批次，需審查製程資料'
+                    : '`exposed_lot_count=0` ⇒ 無受影響批次，直接執行設備診斷'
+            },
+            process_data_review: {
+                description: '查詢 SPC / metrology 資料庫，回傳製程指標與是否有 excursion。',
+                inputs: [['lot_ids', 'string[]'], ['tool_id', 'string'], ['recipe_id', 'string']],
+                outputs: [['spc_violations', 'int'], ['min_cpk', 'float'], ['excursion_detected', 'bool'], ['metrology_oos', 'int']],
+                rows: ok => ok
+                    ? { spc_violations: 5, min_cpk: 0.78, excursion_detected: true, metrology_oos: 12 }
+                    : { spc_violations: 0, min_cpk: 1.42, excursion_detected: false, metrology_oos: 0 },
+                interpret: ok => ok
+                    ? '`excursion_detected=true`、`min_cpk=0.78 < 1.33` ⇒ 偵測到製程異常，開立 MRB'
+                    : '`excursion_detected=false`、`min_cpk=1.42` 正常 ⇒ 無製程異常'
+            },
+            equipment_diagnostics: {
+                description: '執行設備診斷並查詢 subsystem log，回傳診斷碼與 root cause 判定。',
+                inputs: [['tool_id', 'string'], ['chamber_id', 'string']],
+                outputs: [['diag_code', 'string'], ['subsystem', 'string'], ['root_cause_found', 'bool'], ['error_lines', 'int']],
+                rows: ok => ok
+                    ? { diag_code: 'DG-RF-014', subsystem: 'RF_MATCH', root_cause_found: true, error_lines: 23 }
+                    : { diag_code: 'DG-UNK-000', subsystem: 'UNKNOWN', root_cause_found: false, error_lines: 0 },
+                interpret: ok => ok
+                    ? '`root_cause_found=true`（subsystem=RF_MATCH） ⇒ 找到 root cause'
+                    : '`root_cause_found=false` ⇒ 未找到 root cause，需升級'
+            },
+            corrective_action_create: {
+                description: '建立改善措施單並查詢核准狀態。',
+                inputs: [['tool_id', 'string'], ['root_cause', 'string'], ['action_owner', 'string']],
+                outputs: [['ca_id', 'string'], ['approval_state', 'enum'], ['owner', 'string']],
+                rows: ok => ok
+                    ? { ca_id: 'CA-7782', approval_state: 'APPROVED', owner: 'eng.lin' }
+                    : { ca_id: 'CA-7783', approval_state: 'REJECTED', owner: 'eng.lin' },
+                interpret: ok => ok
+                    ? '`approval_state=APPROVED` ⇒ 改善措施核准'
+                    : '`approval_state=REJECTED` ⇒ 改善措施駁回，需升級'
+            },
+            tool_recovery_verify: {
+                description: '查詢 qualification / golden wafer / monitor lot 結果以判定機台是否可釋放。',
+                inputs: [['tool_id', 'string'], ['qualification_plan', 'string']],
+                outputs: [['qual_result', 'enum'], ['golden_wafer_pass', 'bool'], ['monitor_cpk', 'float']],
+                rows: ok => ok
+                    ? { qual_result: 'PASS', golden_wafer_pass: true, monitor_cpk: 1.51 }
+                    : { qual_result: 'FAIL', golden_wafer_pass: false, monitor_cpk: 0.92 },
+                interpret: ok => ok
+                    ? '`qual_result=PASS`、`monitor_cpk=1.51 ≥ 1.33` ⇒ 驗證通過，可釋放機台'
+                    : '`qual_result=FAIL`、`monitor_cpk=0.92` ⇒ 驗證失敗，需升級'
+            },
+            eap_tool_hold: {
+                description: '透過 EAP 對機台套用 engineering hold，回傳設備狀態。',
+                inputs: [['tool_id', 'string'], ['hold_reason', 'string']],
+                outputs: [['hold_id', 'string'], ['applied', 'bool'], ['eqp_state', 'enum']],
+                rows: ok => ok
+                    ? { hold_id: 'HOLD-5521', applied: true, eqp_state: 'DOWN' }
+                    : { hold_id: null, applied: false, eqp_state: 'RUN', error: 'PERMISSION_DENIED' },
+                interpret: ok => ok
+                    ? '`applied=true`、`eqp_state=DOWN` ⇒ hold 套用成功'
+                    : '`applied=false`（PERMISSION_DENIED） ⇒ 無法套用 hold，需升級'
+            },
+            oncall_ack_status: {
+                description: '輪詢 on-call 接手狀態，回傳是否在時限內 ack。',
+                inputs: [['ticket_id', 'string'], ['timeout_minutes', 'int']],
+                outputs: [['ack_state', 'enum'], ['ack_latency_min', 'int'], ['owner', 'string']],
+                rows: ok => ok
+                    ? { ack_state: 'ACK', ack_latency_min: 7, owner: 'oncall.wu' }
+                    : { ack_state: 'NO_ACK', ack_latency_min: 30, owner: null, escalation: 'TIMEOUT' },
+                interpret: ok => ok
+                    ? '`ack_state=ACK`、`ack_latency_min=7` 在時限內 ⇒ 負責人接手'
+                    : '`ack_state=NO_ACK`、逾時 30 分鐘 ⇒ 接手逾時，需升級'
+            },
+            mcp__jira__create_issue: {
+                description: '[MCP jira] 建立 Jira issue 作為追蹤工單，回傳 issue key 與狀態。',
+                inputs: [['project_key', 'string'], ['summary', 'string'], ['severity', 'enum']],
+                outputs: [['issue_key', 'string'], ['url', 'string'], ['created', 'bool'], ['status', 'enum']],
+                rows: ok => ok
+                    ? { issue_key: 'EQP-1487', url: 'https://jira.example/EQP-1487', created: true, status: 'Open' }
+                    : { issue_key: null, created: false, status: 'ERROR', error: 'PROJECT_NOT_FOUND' },
+                interpret: ok => ok
+                    ? '`created=true`、issue_key=EQP-1487 ⇒ 工單建立成功'
+                    : '`created=false`（PROJECT_NOT_FOUND） ⇒ 工單建立失敗，需升級'
+            },
+            mcp__slack__post_message: {
+                description: '[MCP slack] 張貼訊息到指定頻道，回傳是否送達。',
+                inputs: [['channel', 'string'], ['message', 'string']],
+                outputs: [['ts', 'string'], ['delivered', 'bool'], ['channel_id', 'string']],
+                rows: ok => ok
+                    ? { ts: '1716950000.0021', delivered: true, channel_id: 'C0EQPONCALL' }
+                    : { ts: null, delivered: false, channel_id: 'C0EQPONCALL', error: 'CHANNEL_NOT_FOUND' },
+                interpret: ok => ok
+                    ? '`delivered=true` ⇒ 通報送達'
+                    : '`delivered=false`（CHANNEL_NOT_FOUND） ⇒ 通報失敗，需升級'
+            }
+        };
+
+        function sampleParamValue(name) {
+            const samples = {
+                tool_id: 'EQP-CVD-07', event_time: '2026-05-28T03:12:00Z', lookback_hours: 24,
+                lot_ids: ['LOT2391', 'LOT2392'], recipe_id: 'RCP-OX-220', chamber_id: 'CH-B',
+                hold_reason: 'ALARM_ALM-204', root_cause: 'RF_MATCH_DRIFT', action_owner: 'eng.lin',
+                qualification_plan: 'QUAL-STD-03', project_key: 'EQP', summary: 'EQP-CVD-07 anomaly ALM-204',
+                severity: 'major', channel: '#eqp-oncall', message: 'Anomaly on EQP-CVD-07 (ALM-204)',
+                ticket_id: 'EQP-1487', timeout_minutes: 15
+            };
+            return Object.prototype.hasOwnProperty.call(samples, name) ? samples[name] : `<${name}>`;
+        }
+
+        function getToolSpec(state) {
+            if (!state || !state.tool) return null;
+            if (toolCatalog[state.tool]) return toolCatalog[state.tool];
+            // Generic fallback for tools not in the catalog.
+            return {
+                generic: true,
+                description: (state.tool_kind === 'mcp' ? 'MCP server tool' : 'REST API') + ' — 回傳查詢結果供 Agent 判讀。',
+                inputs: (state.parameters || []).map(param => [param, 'string']),
+                outputs: [['status', 'enum(OK|ERROR)'], ['rows_returned', 'int'], ['signal', 'string']],
+                rows: ok => ({ status: ok ? 'OK' : 'ERROR', rows_returned: ok ? Math.max(1, (state.parameters || []).length) : 0 }),
+                interpret: ok => ok ? '`status=OK` 且有回傳資料 ⇒ 走成功分支' : '`status=ERROR` / 無資料 ⇒ 走失敗分支'
+            };
+        }
+
+        // Run the tool as a query for a given branch outcome: returns the fetched dataset
+        // and the agent's interpretation of those values.
+        function mockQueryResult(state, condition) {
+            const spec = getToolSpec(state);
+            if (!spec) return null;
+            const ok = !isFailureOutcome(condition);
+            return {
+                ok,
+                data: spec.rows ? spec.rows(ok) : {},
+                interpretation: spec.interpret ? spec.interpret(ok) : `比對回傳值後符合 \`${condition}\``
+            };
+        }
+
+        function summarizeData(data) {
+            return Object.entries(data || {}).slice(0, 3).map(([key, value]) => {
+                const shown = Array.isArray(value) ? `[${value.length}]` : JSON.stringify(value);
+                return `${key}=${shown}`;
+            }).join(', ');
+        }
+
+        // Render developer-authored interpretation text (backtick code spans only).
+        function renderInterp(text) {
+            return escapeHtml(text).replace(/`([^`]+)`/g, '<code>$1</code>');
+        }
+
         // The "contract" describes how the agent calls the tool and, crucially, how it
-        // interprets the response to choose the next state. This is the validation
-        // mechanism the agent relies on at runtime.
+        // interprets the returned values to choose the next state.
         function buildToolContract(state) {
             if (!state || !state.tool) return null;
             const kind = state.tool_kind || 'api';
@@ -2298,18 +2610,18 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 return {
                     transport: 'MCP',
                     server: state.mcp_server || 'unknown',
-                    signalField: 'structuredContent.outcome',
+                    signalField: 'structuredContent',
                     errorField: 'isError',
-                    verify: 'Agent 先檢查 MCP 回傳的 <code>isError</code> 旗標（true 視為呼叫失敗），再讀取 <code>structuredContent.outcome</code>，比對此 state 的分支條件後選擇下一個 state。'
+                    verify: 'Agent 先檢查 MCP 回傳的 <code>isError</code> 旗標（true 視為呼叫失敗），再讀取 <code>structuredContent</code> 中回傳的數值欄位，依其值比對此 state 的分支條件後選擇下一個 state。'
                 };
             }
             return {
                 transport: 'REST API',
                 endpoint: `/api/${state.tool}`,
                 method: guessHttpMethod(state.tool),
-                signalField: 'body.result',
+                signalField: 'body.data',
                 errorField: 'status',
-                verify: 'Agent 先驗證 HTTP <code>status</code> 是否為 2xx（非 2xx 走失敗分支），再讀取 <code>body.result</code>，比對此 state 的分支條件後選擇下一個 state。'
+                verify: 'Agent 先驗證 HTTP <code>status</code> 是否為 2xx（非 2xx 走失敗分支），再讀取 <code>body.data</code> 取回的 wafer / tool 數值，依其值比對此 state 的分支條件後選擇下一個 state。'
             };
         }
 
@@ -2317,30 +2629,31 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const contract = buildToolContract(state);
             if (!contract) return null;
             const args = {};
-            (state.parameters || []).forEach(param => { args[param] = `<${param}>`; });
+            (state.parameters || []).forEach(param => { args[param] = sampleParamValue(param); });
             if (contract.transport === 'MCP') {
                 return { transport: 'MCP', server: contract.server, tool: state.tool, arguments: args };
             }
-            return { transport: 'REST API', method: contract.method, endpoint: contract.endpoint, body: args };
+            return { transport: 'REST API', method: contract.method, endpoint: contract.endpoint, query: args };
         }
 
         function buildMockResponse(state, condition) {
             const contract = buildToolContract(state);
             if (!contract) return null;
-            const failed = isFailureOutcome(condition);
+            const query = mockQueryResult(state, condition);
+            const failed = !query.ok;
             if (contract.transport === 'MCP') {
                 return {
                     transport: 'MCP',
                     server: contract.server,
                     isError: failed,
-                    structuredContent: { outcome: condition },
-                    content: [{ type: 'text', text: `${state.tool}: ${condition}` }]
+                    structuredContent: query.data,
+                    content: [{ type: 'text', text: JSON.stringify(query.data) }]
                 };
             }
             return {
                 transport: 'REST API',
                 status: failed ? 422 : 200,
-                body: { result: condition, verified: !failed }
+                body: { row_count: 1, data: query.data }
             };
         }
 
@@ -2373,6 +2686,25 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             renderSkillSimulator();
         }
 
+        // Render an advertised tool schema (description + input/output) — the kind of
+        // contract a real MCP server exposes when it is mounted.
+        function renderToolSchema(flow, toolName) {
+            const st = flow.states.find(state => state.tool === toolName) || { tool: toolName, parameters: [] };
+            const spec = getToolSpec(st) || {};
+            const tags = pairs => (pairs && pairs.length
+                ? pairs.map(([name, type]) => `<span class="mcp-tool-tag">${escapeHtml(name)}: ${escapeHtml(type)}</span>`).join('')
+                : '<span class="mcp-tool-tag">—</span>');
+            return `
+                <details class="mcp-tool-detail">
+                    <summary><code>${escapeHtml(toolName)}</code></summary>
+                    <div class="mcp-tool-desc">${escapeHtml(spec.description || '')}</div>
+                    <div class="mcp-io-label">input</div>
+                    <div class="mcp-tool-tags">${tags(spec.inputs)}</div>
+                    <div class="mcp-io-label">output (回傳數值)</div>
+                    <div class="mcp-tool-tags">${tags(spec.outputs)}</div>
+                </details>`;
+        }
+
         function renderMcpPanel() {
             const panel = document.getElementById('mcp-mount-panel');
             if (!panel) return;
@@ -2383,31 +2715,33 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             servers.forEach((tools, server) => {
                 const mounted = !!mcpMounts[server];
-                const toolTags = [...tools].sort().map(tool => `<span class="mcp-tool-tag">${escapeHtml(tool)}</span>`).join('');
+                const schemas = [...tools].sort().map(tool => renderToolSchema(flow, tool)).join('');
                 cards.push(`
                     <div class="mcp-card ${mounted ? 'mounted' : ''}">
                         <div class="mcp-card-head">
                             <span class="mcp-card-title"><i data-lucide="server" style="width:15px; color: var(--accent);"></i> ${escapeHtml(server)}</span>
                             <span class="mcp-status ${mounted ? 'on' : 'off'}">${mounted ? '已掛載' : '未掛載'}</span>
                         </div>
-                        <div class="mcp-tool-tags">${toolTags}</div>
                         <button class="mount-btn ${mounted ? 'is-mounted' : ''}" onclick="toggleMount('${escapeHtml(server)}')">
                             <i data-lucide="${mounted ? 'check' : 'plug-zap'}" style="width:15px;"></i> ${mounted ? '已連線 (點擊卸載)' : `掛載 ${escapeHtml(server)} MCP server`}
                         </button>
+                        <div class="mcp-io-label" style="margin-top:10px;">advertised tools (${tools.size})</div>
+                        ${schemas}
                     </div>
                 `);
             });
 
             if (apiTools.length) {
-                const toolTags = apiTools.map(tool => `<span class="mcp-tool-tag">${escapeHtml(tool)}</span>`).join('');
+                const schemas = apiTools.map(tool => renderToolSchema(flow, tool)).join('');
                 cards.push(`
                     <div class="mcp-card api">
                         <div class="mcp-card-head">
                             <span class="mcp-card-title"><i data-lucide="globe" style="width:15px; color: var(--secondary);"></i> REST API</span>
                             <span class="mcp-status on">直接可用</span>
                         </div>
-                        <div class="mcp-tool-tags">${toolTags}</div>
                         <button class="mount-btn is-mounted" disabled><i data-lucide="check" style="width:15px;"></i> 內部 API 端點，無需掛載</button>
+                        <div class="mcp-io-label" style="margin-top:10px;">api endpoints (${apiTools.length})</div>
+                        ${schemas}
                     </div>
                 `);
             }
@@ -2435,12 +2769,14 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             const entry = { stateId: targetStateId, condition };
             if (sourceState && sourceState.tool) {
+                const query = mockQueryResult(sourceState, condition);
                 entry.via = {
                     fromState: sourceState.id,
                     tool: sourceState.tool,
                     transport: contract.transport,
                     server: contract.server || null,
-                    response: buildMockResponse(sourceState, condition)
+                    response: buildMockResponse(sourceState, condition),
+                    interpretation: query.interpretation
                 };
             }
             simulationState.currentStateId = targetStateId;
@@ -2478,7 +2814,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 ? `<span class="sim-pill" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)'}; border-color: ${state.tool_kind === 'mcp' ? 'rgba(217,70,239,0.4)' : 'rgba(79,172,254,0.4)'}">${escapeHtml(state.tool_kind.toUpperCase())}${state.tool_kind === 'mcp' && state.mcp_server ? ` · ${escapeHtml(state.mcp_server)}` : ''}</span>`
                 : '';
 
+            const spec = getToolSpec(state);
             let requestBlock = '';
+            let schemaBlock = '';
             let verifyBlock = '';
             if (contract && request) {
                 requestBlock = `
@@ -2486,6 +2824,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         <div class="sim-io-head"><i data-lucide="arrow-up-right" style="width:14px;"></i> 工具呼叫 Request · ${escapeHtml(contract.transport)}</div>
                         <pre>${escapeHtml(JSON.stringify(request, null, 2))}</pre>
                     </div>`;
+                if (spec) {
+                    const outs = spec.outputs.map(([name, type]) => `<span class="mcp-tool-tag">${escapeHtml(name)}: ${escapeHtml(type)}</span>`).join('');
+                    schemaBlock = `<div style="margin-top:10px;"><div class="inspector-label" style="margin-bottom:6px;">回傳欄位 Schema (查詢取回的 wafer / tool 數值)</div><div class="mcp-tool-tags">${outs}</div></div>`;
+                }
                 verifyBlock = `<div class="sim-verify"><strong>回傳判讀機制：</strong> ${contract.verify}</div>`;
             }
 
@@ -2499,16 +2841,14 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         <button class="mount-btn" onclick="toggleMount('${escapeHtml(contract.server)}')"><i data-lucide="plug-zap" style="width:15px;"></i> 立即掛載 ${escapeHtml(contract.server)}</button>
                     </div>`;
             } else {
-                const label = state.tool ? '模擬回傳結果 (點擊一種 API / MCP 回傳)' : '選擇分支結果';
+                const label = state.tool ? '模擬查詢回傳 (點選一種 wafer / tool 數值情境，Agent 判讀後路由)' : '選擇分支結果';
                 choiceSection = `
                     <div class="inspector-label" style="margin-bottom:6px;">${label}</div>
                     <div class="sim-choice-grid">
                         ${choices.map(([condition, target]) => {
-                            const resp = state.tool ? buildMockResponse(state, condition) : null;
-                            const signal = resp
-                                ? (resp.transport === 'MCP' ? `isError=${resp.isError} · outcome="${condition}"` : `status=${resp.status} · result="${condition}"`)
-                                : '';
-                            return `<button class="sim-choice" onclick="simulateResponse('${escapeHtml(condition)}', '${escapeHtml(target)}')"><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}${signal ? `<span class="sim-choice-signal">&#8627; ${escapeHtml(signal)}</span>` : ''}</button>`;
+                            const query = state.tool ? mockQueryResult(state, condition) : null;
+                            const hint = query ? summarizeData(query.data) : '';
+                            return `<button class="sim-choice" onclick="simulateResponse('${escapeHtml(condition)}', '${escapeHtml(target)}')"><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}${hint ? `<span class="sim-choice-signal">&#8627; 回傳 { ${escapeHtml(hint)} }</span>` : ''}</button>`;
                         }).join('')}
                     </div>`;
             }
@@ -2523,19 +2863,26 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 </div>
                 <p style="color: var(--text-muted);">${escapeHtml(state.description)}</p>
                 ${requestBlock}
+                ${schemaBlock}
                 ${verifyBlock}
                 <div class="sim-choice-grid-wrap">${choiceSection}</div>
             `;
 
             historyPanel.innerHTML = `
-                <h4>執行歷程</h4>
+                <h4><i data-lucide="search" style="width:16px; vertical-align:-3px;"></i> 查案歷程 (Investigation Log)</h4>
                 <ol>
                     ${simulationState.history.map(item => {
                         let detail = `<span>${escapeHtml(item.condition)}</span>`;
                         if (item.via) {
                             const resp = item.via.response;
                             const sig = resp.transport === 'MCP' ? `isError=${resp.isError}` : `HTTP ${resp.status}`;
-                            detail += `<br><span class="sim-resp-tag">${escapeHtml(item.via.transport)} · ${escapeHtml(item.via.tool)} · ${escapeHtml(sig)}</span>`;
+                            const data = resp.transport === 'MCP' ? resp.structuredContent : resp.body.data;
+                            detail += `
+                                <div class="sim-hist-call">
+                                    <span class="sim-resp-tag">${escapeHtml(item.via.transport)} · ${escapeHtml(item.via.tool)} · ${escapeHtml(sig)}</span>
+                                    <pre class="sim-hist-data">${escapeHtml(JSON.stringify(data))}</pre>
+                                    <div class="sim-hist-interp"><strong>判讀：</strong>${renderInterp(item.via.interpretation)}</div>
+                                </div>`;
                         }
                         return `<li><code>${escapeHtml(item.stateId)}</code><br>${detail}</li>`;
                     }).join('')}
