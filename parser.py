@@ -173,6 +173,41 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
             findings.append(f"終點狀態 `{state.id}` 沒有任何分支會連到它。")
             suggestions.append(f"新增一個會轉移到 `{state.id}` 的分支，或移除未使用的終點狀態。")
 
+    # API / MCP integration validation: ensure each tool step gives the agent enough
+    # to call the tool AND to interpret the response into a next step.
+    integration_rows = []
+    mcp_servers_needed = set()
+    for state in flow_data.states:
+        if not state.tool:
+            continue
+        kind = (state.tool_kind or "api").upper()
+        outcomes = list(state.next_states.keys()) if state.next_states else []
+        issues = []
+        if not state.parameters and state.type != "end_state":
+            issues.append("缺少參數宣告")
+            findings.append(f"工具 state `{state.id}` (`{state.tool}`) 未宣告參數，Agent 不知道呼叫時要送哪些欄位。")
+            suggestions.append(f"為 `{state.id}` 的 `System/Tool` 補上 backtick 參數，例如 (參數: `id`)。")
+        if state.type != "end_state" and len(outcomes) < 2:
+            issues.append("回傳分支不足")
+            findings.append(f"工具 state `{state.id}` 只有 {len(outcomes)} 個回傳分支，Agent 無法依 API / MCP 回傳判讀不同結果。")
+            suggestions.append(f"為 `{state.id}` 至少補上 success / failure 兩種可區分的 `**If ...**:` 回傳分支。")
+        if state.tool_kind == "mcp":
+            if state.mcp_server:
+                mcp_servers_needed.add(state.mcp_server)
+            else:
+                issues.append("MCP server 未指定")
+                findings.append(f"MCP 工具 `{state.tool}` 未能解析出 server 名稱，執行前無法掛載。")
+                suggestions.append("使用 `mcp__<server>__<tool>` 命名或加上 `(MCP: server)` 標註。")
+        integration_rows.append({
+            "id": state.id,
+            "kind": kind,
+            "server": state.mcp_server or "",
+            "params": len(state.parameters or []),
+            "outcomes": len(outcomes),
+            "ok": not issues,
+            "issues": issues,
+        })
+
     unique_suggestions = []
     for suggestion in suggestions:
         if suggestion not in unique_suggestions:
@@ -199,9 +234,30 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
     else:
         report += "- 轉換前不需要修改。\n"
 
+    report += "\n## API / MCP 整合驗證\n\n"
+    if integration_rows:
+        report += "| State | 整合 | Server | Params | 回傳分支 | 驗證 |\n"
+        report += "| --- | --- | --- | --- | --- | --- |\n"
+        for row in integration_rows:
+            server_cell = f"`{row['server']}`" if row["server"] else "-"
+            verdict = "✅ 通過" if row["ok"] else "⚠️ " + "、".join(row["issues"])
+            report += f"| `{row['id']}` | {row['kind']} | {server_cell} | {row['params']} | {row['outcomes']} | {verdict} |\n"
+        if mcp_servers_needed:
+            servers = "、".join(f"`{server}`" for server in sorted(mcp_servers_needed))
+            report += f"\n執行前需掛載的 MCP server：{servers}。\n"
+        else:
+            report += "\n此 SOP 未使用 MCP 工具（皆為 API 呼叫）。\n"
+        report += (
+            "\n每個工具 state 的回傳分支即為 Agent 的「回傳判讀規則」："
+            "API 依 HTTP `status` 與 `body.result`、MCP 依 `isError` 與 "
+            "`structuredContent.outcome` 比對分支後決定下一步。\n"
+        )
+    else:
+        report += "- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n"
+
     if rules_content:
         report += "\n## 規則摘要\n\n"
-        report += "本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target，以及 end state 可達性。\n"
+        report += "本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳判讀規則、MCP server 掛載需求）。\n"
 
     return report
 

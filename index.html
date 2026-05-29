@@ -697,6 +697,192 @@
             margin-bottom: 10px;
         }
 
+        /* MCP mount panel */
+        .mcp-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+        }
+
+        .mcp-card {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .mcp-card.mounted {
+            border-color: rgba(16, 185, 129, 0.45);
+            box-shadow: 0 0 0 1px rgba(16,185,129,0.12), 0 8px 24px rgba(16,185,129,0.06);
+        }
+
+        .mcp-card.api {
+            border-style: dashed;
+        }
+
+        .mcp-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mcp-card-title {
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mcp-status {
+            font-size: 0.72rem;
+            font-family: 'Fira Code', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .mcp-status.on { color: var(--green); border-color: rgba(16,185,129,0.45); }
+        .mcp-status.off { color: var(--amber); border-color: rgba(245,158,11,0.4); }
+
+        .mcp-tool-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .mcp-tool-tag {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 3px 7px;
+        }
+
+        .mount-btn {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .mount-btn:hover { border-color: rgba(0,242,254,0.35); background: rgba(0,242,254,0.06); }
+        .mount-btn.is-mounted { color: var(--green); border-color: rgba(16,185,129,0.4); }
+
+        /* Simulator request / response / verification blocks */
+        .sim-io {
+            margin-top: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .sim-io-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sim-io pre {
+            margin: 0;
+            padding: 12px;
+            background: var(--code-bg);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.78rem;
+            line-height: 1.5;
+            color: #a7f3d0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .sim-verify {
+            margin-top: 12px;
+            border-left: 3px solid var(--primary);
+            background: rgba(0, 242, 254, 0.04);
+            border-radius: 0 8px 8px 0;
+            padding: 10px 14px;
+            font-size: 0.86rem;
+            color: var(--text-main);
+        }
+
+        .sim-verify code {
+            font-family: 'Fira Code', monospace;
+            color: var(--primary);
+            background: rgba(0,0,0,0.3);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
+        .sim-warning {
+            margin-top: 12px;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.06);
+            border-radius: 8px;
+            padding: 12px 14px;
+            color: var(--amber);
+            font-size: 0.86rem;
+        }
+
+        .sim-warning .mount-btn {
+            margin-top: 10px;
+            width: auto;
+            display: inline-flex;
+            color: var(--amber);
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .sim-choice .sim-choice-signal {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .sim-choice:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .sim-resp-tag {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.72rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
         .section-title-row {
             display: flex;
             align-items: center;
@@ -961,10 +1147,17 @@
 
         </section>
 
+        <!-- MCP / API Runtime Mounting & Validation -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="plug"></i> MCP Server 掛載與工具驗證 (Runtime Mount &amp; Validation)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">編譯時會驗證每個 <code>API</code> / <code>MCP</code> 工具的「參數契約」與「回傳判讀規則」（詳見上方 SOP 品質報告）。<code>MCP</code> 工具需先掛載對應 server，下方執行模擬器才能成功呼叫；<code>API</code> 工具則以 REST endpoint 直接呼叫。</p>
+            <div class="mcp-grid" id="mcp-mount-panel"></div>
+        </section>
+
         <!-- Skill Execution Simulator -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 <code>flow.json</code> 的 start state 開始，點選分支條件來模擬 Skill 執行路徑。</p>
+            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器 (API / MCP Call Simulation)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 <code>flow.json</code> 的 start state 開始。每個工具 state 會模擬實際的 <code>API</code> / <code>MCP</code> 呼叫與回傳，並示範 Agent 如何<strong>判讀回傳值</strong>以決定下一步路由。</p>
             <div class="simulator-layout">
                 <div class="sim-state-card" id="simulator-current-state"></div>
                 <div class="sim-history" id="simulator-history"></div>
@@ -1265,6 +1458,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             currentStateId: null,
             history: []
         };
+        // Simulated runtime mount state for MCP servers: { serverName: boolean }.
+        let mcpMounts = {};
 
         // Tab switcher
         function switchTab(e, tabId) {
@@ -1503,11 +1698,12 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 '正在讀取 Markdown SOP 檔案...',
                 '正在發送至 Gemini 2.5 Flash 模型...',
                 '正在解析與結構化狀態圖 (StateMachine)...',
-                '正在識別與關聯系統 Tool API 宣告...',
-                '正在建立 Skill 目錄 /skills/tool_fault_investigation...',
+                '正在分類工具整合方式 (API / MCP) 與 server...',
+                '正在驗證 API / MCP 工具參數契約...',
+                '正在建立回傳判讀規則 (response → branch)...',
                 '寫入檔案 SKILL.md (合法 Skill 入口完成)...',
                 '寫入檔案 flow.json (流程圖編譯完成)...',
-                '執行 Skill 格式驗證...',
+                '執行 Skill 格式與整合驗證...',
                 '編譯完成！此目錄可被 Agent 作為 Skill 載入。'
             ];
 
@@ -1525,6 +1721,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     syncQualityReport(document.getElementById('markdown-input').value);
                     renderRuleAndReportBlocks();
                     renderFlowFromGeneratedJson();
+                    syncMcpMounts(flow);
+                    renderMcpPanel();
                     resetSimulation();
                     display.textContent = generatedFiles[currentTab];
                 }
@@ -1710,6 +1908,36 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     suggestions.push(`新增一個會轉移到 \`${state.id}\` 的分支，或移除未使用的終點狀態。`);
                 });
 
+            // API / MCP integration validation: ensure each tool step gives the agent
+            // enough to call the tool AND to interpret the response into a next step.
+            const integrationRows = [];
+            const mcpServersNeeded = new Set();
+            flow.states.forEach(state => {
+                if (!state.tool) return;
+                const kind = (state.tool_kind || 'api').toUpperCase();
+                const outcomes = Object.keys(state.next_states || {});
+                const issues = [];
+                if (!(state.parameters && state.parameters.length) && state.type !== 'end_state') {
+                    issues.push('缺少參數宣告');
+                    findings.push(`工具 state \`${state.id}\` (\`${state.tool}\`) 未宣告參數，Agent 不知道呼叫時要送哪些欄位。`);
+                    suggestions.push(`為 \`${state.id}\` 的 \`System/Tool\` 補上 backtick 參數，例如 (參數: \`id\`)。`);
+                }
+                if (state.type !== 'end_state' && outcomes.length < 2) {
+                    issues.push('回傳分支不足');
+                    findings.push(`工具 state \`${state.id}\` 只有 ${outcomes.length} 個回傳分支，Agent 無法依 API / MCP 回傳判讀不同結果。`);
+                    suggestions.push(`為 \`${state.id}\` 至少補上 success / failure 兩種可區分的 \`**If ...**:\` 回傳分支。`);
+                }
+                if (state.tool_kind === 'mcp') {
+                    if (state.mcp_server) mcpServersNeeded.add(state.mcp_server);
+                    else {
+                        issues.push('MCP server 未指定');
+                        findings.push(`MCP 工具 \`${state.tool}\` 未能解析出 server 名稱，執行前無法掛載。`);
+                        suggestions.push(`使用 \`mcp__<server>__<tool>\` 命名或加上 \`(MCP: server)\` 標註。`);
+                    }
+                }
+                integrationRows.push({ id: state.id, tool: state.tool, kind, server: state.mcp_server || '', params: (state.parameters || []).length, outcomes: outcomes.length, ok: issues.length === 0, issues });
+            });
+
             const uniqueSuggestions = [...new Set(suggestions)];
             let report = `# SOP 品質報告\n\n`;
             report += `- **狀態**: \`${findings.length ? '需要修訂' : '通過'}\`\n`;
@@ -1720,8 +1948,23 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             report += findings.length ? findings.map(item => `- ${item}`).join('\n') : '- 未發現阻擋轉換的品質問題。';
             report += `\n\n## SOP 修改建議\n\n`;
             report += uniqueSuggestions.length ? uniqueSuggestions.map(item => `- ${item}`).join('\n') : '- 轉換前不需要修改。';
-            report += `\n\n## 規則摘要\n\n`;
-            report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target，以及 end state 可達性。`;
+            report += `\n\n## API / MCP 整合驗證\n\n`;
+            if (integrationRows.length) {
+                report += `| State | 整合 | Server | Params | 回傳分支 | 驗證 |\n`;
+                report += `| --- | --- | --- | --- | --- | --- |\n`;
+                integrationRows.forEach(row => {
+                    report += `| \`${row.id}\` | ${row.kind} | ${row.server ? '`' + row.server + '`' : '-'} | ${row.params} | ${row.outcomes} | ${row.ok ? '✅ 通過' : '⚠️ ' + row.issues.join('、')} |\n`;
+                });
+                report += mcpServersNeeded.size
+                    ? `\n執行前需掛載的 MCP server：${[...mcpServersNeeded].map(server => '`' + server + '`').join('、')}。\n`
+                    : `\n此 SOP 未使用 MCP 工具（皆為 API 呼叫）。\n`;
+                report += `\n每個工具 state 的回傳分支即為 Agent 的「回傳判讀規則」：API 依 HTTP \`status\` 與 \`body.result\`、MCP 依 \`isError\` 與 \`structuredContent.outcome\` 比對分支後決定下一步。\n`;
+            } else {
+                report += `- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n`;
+            }
+
+            report += `\n## 規則摘要\n\n`;
+            report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳判讀規則、MCP server 掛載需求）。`;
             return report;
         }
 
@@ -1985,6 +2228,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             const flow = parseGeneratedFlow();
             const state = flow.states.find(item => item.id === nodeId);
+            const contract = buildToolContract(state);
             const transitions = state.next_states && Object.keys(state.next_states).length
                 ? `<ul>${Object.entries(state.next_states).map(([condition, target]) => `<li><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}</li>`).join('')}</ul>`
                 : 'None (Terminal state)';
@@ -2018,6 +2262,11 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                             <div class="inspector-label">下一步跳轉路由</div>
                             <div class="inspector-val">${transitions}</div>
                         </div>
+                        ${contract ? `
+                        <div class="inspector-item" style="grid-column: span 2">
+                            <div class="inspector-label">回傳判讀 (Response Verification)</div>
+                            <div class="inspector-val" style="font-size:0.88rem; color: var(--text-muted);">${contract.verify}</div>
+                        </div>` : ''}
                     </div>
                 </div>
             `;
@@ -2026,6 +2275,147 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
         function getStateById(stateId) {
             return parseGeneratedFlow().states.find(state => state.id === stateId);
+        }
+
+        // --- API / MCP runtime contract, validation & mock execution ---------------
+
+        // Heuristic: does a branch condition describe a failure / negative outcome?
+        function isFailureOutcome(condition) {
+            return /(fail|reject|error|timeout|invalid|cannot|unable|denied|missing|false|not |no |逾時|失敗|駁回|無法|未|錯誤|拒絕|否)/i.test(condition);
+        }
+
+        function guessHttpMethod(toolName) {
+            return /(lookup|get|query|status|read|list|fetch|check|review|verify)/i.test(toolName || '') ? 'GET' : 'POST';
+        }
+
+        // The "contract" describes how the agent calls the tool and, crucially, how it
+        // interprets the response to choose the next state. This is the validation
+        // mechanism the agent relies on at runtime.
+        function buildToolContract(state) {
+            if (!state || !state.tool) return null;
+            const kind = state.tool_kind || 'api';
+            if (kind === 'mcp') {
+                return {
+                    transport: 'MCP',
+                    server: state.mcp_server || 'unknown',
+                    signalField: 'structuredContent.outcome',
+                    errorField: 'isError',
+                    verify: 'Agent 先檢查 MCP 回傳的 <code>isError</code> 旗標（true 視為呼叫失敗），再讀取 <code>structuredContent.outcome</code>，比對此 state 的分支條件後選擇下一個 state。'
+                };
+            }
+            return {
+                transport: 'REST API',
+                endpoint: `/api/${state.tool}`,
+                method: guessHttpMethod(state.tool),
+                signalField: 'body.result',
+                errorField: 'status',
+                verify: 'Agent 先驗證 HTTP <code>status</code> 是否為 2xx（非 2xx 走失敗分支），再讀取 <code>body.result</code>，比對此 state 的分支條件後選擇下一個 state。'
+            };
+        }
+
+        function buildMockRequest(state) {
+            const contract = buildToolContract(state);
+            if (!contract) return null;
+            const args = {};
+            (state.parameters || []).forEach(param => { args[param] = `<${param}>`; });
+            if (contract.transport === 'MCP') {
+                return { transport: 'MCP', server: contract.server, tool: state.tool, arguments: args };
+            }
+            return { transport: 'REST API', method: contract.method, endpoint: contract.endpoint, body: args };
+        }
+
+        function buildMockResponse(state, condition) {
+            const contract = buildToolContract(state);
+            if (!contract) return null;
+            const failed = isFailureOutcome(condition);
+            if (contract.transport === 'MCP') {
+                return {
+                    transport: 'MCP',
+                    server: contract.server,
+                    isError: failed,
+                    structuredContent: { outcome: condition },
+                    content: [{ type: 'text', text: `${state.tool}: ${condition}` }]
+                };
+            }
+            return {
+                transport: 'REST API',
+                status: failed ? 422 : 200,
+                body: { result: condition, verified: !failed }
+            };
+        }
+
+        function collectMcpServers(flow) {
+            const servers = new Map();
+            flow.states.forEach(state => {
+                if (state.tool && state.tool_kind === 'mcp') {
+                    const server = state.mcp_server || 'unknown';
+                    if (!servers.has(server)) servers.set(server, new Set());
+                    servers.get(server).add(state.tool);
+                }
+            });
+            return servers;
+        }
+
+        function collectApiTools(flow) {
+            return [...new Set(flow.states.filter(s => s.tool && s.tool_kind !== 'mcp').map(s => s.tool))].sort();
+        }
+
+        function syncMcpMounts(flow) {
+            const servers = collectMcpServers(flow);
+            const next = {};
+            servers.forEach((_, server) => { next[server] = mcpMounts[server] || false; });
+            mcpMounts = next;
+        }
+
+        function toggleMount(server) {
+            mcpMounts[server] = !mcpMounts[server];
+            renderMcpPanel();
+            renderSkillSimulator();
+        }
+
+        function renderMcpPanel() {
+            const panel = document.getElementById('mcp-mount-panel');
+            if (!panel) return;
+            const flow = parseGeneratedFlow();
+            const servers = collectMcpServers(flow);
+            const apiTools = collectApiTools(flow);
+            const cards = [];
+
+            servers.forEach((tools, server) => {
+                const mounted = !!mcpMounts[server];
+                const toolTags = [...tools].sort().map(tool => `<span class="mcp-tool-tag">${escapeHtml(tool)}</span>`).join('');
+                cards.push(`
+                    <div class="mcp-card ${mounted ? 'mounted' : ''}">
+                        <div class="mcp-card-head">
+                            <span class="mcp-card-title"><i data-lucide="server" style="width:15px; color: var(--accent);"></i> ${escapeHtml(server)}</span>
+                            <span class="mcp-status ${mounted ? 'on' : 'off'}">${mounted ? '已掛載' : '未掛載'}</span>
+                        </div>
+                        <div class="mcp-tool-tags">${toolTags}</div>
+                        <button class="mount-btn ${mounted ? 'is-mounted' : ''}" onclick="toggleMount('${escapeHtml(server)}')">
+                            <i data-lucide="${mounted ? 'check' : 'plug-zap'}" style="width:15px;"></i> ${mounted ? '已連線 (點擊卸載)' : `掛載 ${escapeHtml(server)} MCP server`}
+                        </button>
+                    </div>
+                `);
+            });
+
+            if (apiTools.length) {
+                const toolTags = apiTools.map(tool => `<span class="mcp-tool-tag">${escapeHtml(tool)}</span>`).join('');
+                cards.push(`
+                    <div class="mcp-card api">
+                        <div class="mcp-card-head">
+                            <span class="mcp-card-title"><i data-lucide="globe" style="width:15px; color: var(--secondary);"></i> REST API</span>
+                            <span class="mcp-status on">直接可用</span>
+                        </div>
+                        <div class="mcp-tool-tags">${toolTags}</div>
+                        <button class="mount-btn is-mounted" disabled><i data-lucide="check" style="width:15px;"></i> 內部 API 端點，無需掛載</button>
+                    </div>
+                `);
+            }
+
+            panel.innerHTML = cards.length
+                ? cards.join('')
+                : '<p style="color: var(--text-muted);">此 SOP 未使用任何 API 或 MCP 工具。</p>';
+            lucide.createIcons();
         }
 
         function resetSimulation() {
@@ -2037,9 +2427,24 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             renderSkillSimulator();
         }
 
-        function stepSimulation(condition, targetStateId) {
+        function simulateResponse(condition, targetStateId) {
+            const sourceState = getStateById(simulationState.currentStateId);
+            const contract = buildToolContract(sourceState);
+            // Guard: an MCP tool cannot be called until its server is mounted.
+            if (contract && contract.transport === 'MCP' && !mcpMounts[contract.server]) return;
+
+            const entry = { stateId: targetStateId, condition };
+            if (sourceState && sourceState.tool) {
+                entry.via = {
+                    fromState: sourceState.id,
+                    tool: sourceState.tool,
+                    transport: contract.transport,
+                    server: contract.server || null,
+                    response: buildMockResponse(sourceState, condition)
+                };
+            }
             simulationState.currentStateId = targetStateId;
-            simulationState.history.push({ stateId: targetStateId, condition });
+            simulationState.history.push(entry);
             renderSkillSimulator();
         }
 
@@ -2065,26 +2470,75 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             const choices = Object.entries(state.next_states || {});
             const params = (state.parameters || []).join(', ') || 'None';
+            const contract = buildToolContract(state);
+            const request = buildMockRequest(state);
+            const mcpBlocked = contract && contract.transport === 'MCP' && !mcpMounts[contract.server];
+
+            const kindPill = state.tool_kind
+                ? `<span class="sim-pill" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)'}; border-color: ${state.tool_kind === 'mcp' ? 'rgba(217,70,239,0.4)' : 'rgba(79,172,254,0.4)'}">${escapeHtml(state.tool_kind.toUpperCase())}${state.tool_kind === 'mcp' && state.mcp_server ? ` · ${escapeHtml(state.mcp_server)}` : ''}</span>`
+                : '';
+
+            let requestBlock = '';
+            let verifyBlock = '';
+            if (contract && request) {
+                requestBlock = `
+                    <div class="sim-io">
+                        <div class="sim-io-head"><i data-lucide="arrow-up-right" style="width:14px;"></i> 工具呼叫 Request · ${escapeHtml(contract.transport)}</div>
+                        <pre>${escapeHtml(JSON.stringify(request, null, 2))}</pre>
+                    </div>`;
+                verifyBlock = `<div class="sim-verify"><strong>回傳判讀機制：</strong> ${contract.verify}</div>`;
+            }
+
+            let choiceSection;
+            if (!choices.length) {
+                choiceSection = '<div class="sim-pill">已抵達終點狀態，流程結束。</div>';
+            } else if (mcpBlocked) {
+                choiceSection = `
+                    <div class="sim-warning">
+                        <div><i data-lucide="alert-triangle" style="width:15px; vertical-align:-2px;"></i> MCP server <code>${escapeHtml(contract.server)}</code> 尚未掛載，無法執行此工具呼叫。</div>
+                        <button class="mount-btn" onclick="toggleMount('${escapeHtml(contract.server)}')"><i data-lucide="plug-zap" style="width:15px;"></i> 立即掛載 ${escapeHtml(contract.server)}</button>
+                    </div>`;
+            } else {
+                const label = state.tool ? '模擬回傳結果 (點擊一種 API / MCP 回傳)' : '選擇分支結果';
+                choiceSection = `
+                    <div class="inspector-label" style="margin-bottom:6px;">${label}</div>
+                    <div class="sim-choice-grid">
+                        ${choices.map(([condition, target]) => {
+                            const resp = state.tool ? buildMockResponse(state, condition) : null;
+                            const signal = resp
+                                ? (resp.transport === 'MCP' ? `isError=${resp.isError} · outcome="${condition}"` : `status=${resp.status} · result="${condition}"`)
+                                : '';
+                            return `<button class="sim-choice" onclick="simulateResponse('${escapeHtml(condition)}', '${escapeHtml(target)}')"><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}${signal ? `<span class="sim-choice-signal">&#8627; ${escapeHtml(signal)}</span>` : ''}</button>`;
+                        }).join('')}
+                    </div>`;
+            }
+
             currentPanel.innerHTML = `
                 <h3><code>${escapeHtml(state.id)}</code></h3>
                 <div class="sim-state-meta">
                     <span class="sim-pill">${escapeHtml(state.type)}</span>
                     <span class="sim-pill">tool: ${escapeHtml(state.tool || 'None')}</span>
-                    ${state.tool_kind ? `<span class="sim-pill" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)'}; border-color: ${state.tool_kind === 'mcp' ? 'rgba(217,70,239,0.4)' : 'rgba(79,172,254,0.4)'}">${escapeHtml(state.tool_kind.toUpperCase())}${state.tool_kind === 'mcp' && state.mcp_server ? ` · ${escapeHtml(state.mcp_server)}` : ''}</span>` : ''}
+                    ${kindPill}
                     <span class="sim-pill">params: ${escapeHtml(params)}</span>
                 </div>
                 <p style="color: var(--text-muted);">${escapeHtml(state.description)}</p>
-                <div class="sim-choice-grid">
-                    ${choices.length
-                        ? choices.map(([condition, target]) => `<button class="sim-choice" onclick="stepSimulation('${escapeHtml(condition)}', '${escapeHtml(target)}')"><code>${escapeHtml(condition)}</code> &rarr; ${escapeHtml(target)}</button>`).join('')
-                        : '<div class="sim-pill">已抵達終點狀態，流程結束。</div>'}
-                </div>
+                ${requestBlock}
+                ${verifyBlock}
+                <div class="sim-choice-grid-wrap">${choiceSection}</div>
             `;
 
             historyPanel.innerHTML = `
                 <h4>執行歷程</h4>
                 <ol>
-                    ${simulationState.history.map(item => `<li><code>${escapeHtml(item.stateId)}</code><br><span>${escapeHtml(item.condition)}</span></li>`).join('')}
+                    ${simulationState.history.map(item => {
+                        let detail = `<span>${escapeHtml(item.condition)}</span>`;
+                        if (item.via) {
+                            const resp = item.via.response;
+                            const sig = resp.transport === 'MCP' ? `isError=${resp.isError}` : `HTTP ${resp.status}`;
+                            detail += `<br><span class="sim-resp-tag">${escapeHtml(item.via.transport)} · ${escapeHtml(item.via.tool)} · ${escapeHtml(sig)}</span>`;
+                        }
+                        return `<li><code>${escapeHtml(item.stateId)}</code><br>${detail}</li>`;
+                    }).join('')}
                 </ol>
             `;
             backBtn.disabled = simulationState.history.length <= 1;
@@ -2223,6 +2677,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         renderRuleAndReportBlocks();
         renderMarkdownPreview();
         renderFlowFromGeneratedJson();
+        syncMcpMounts(parseGeneratedFlow());
+        renderMcpPanel();
         resetSimulation();
     </script>
 </body>
