@@ -27,6 +27,13 @@ Output Skill bundle per SOP:
   legal-only tool calls + outcomes, human-in-the-loop **approval gates** (inferred via
   `DEFAULT_APPROVAL_KEYWORDS`, e.g. hold/escalate/release), and a serializable audit trail.
   CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`.
+- `optimizer.py` — **structured self-evolution** of a flow (M2.5), the structured analogue
+  of SkillOpt. Proposes **bounded graph edits** (`Edit`: add_transition / set_signal_field),
+  accepts one **only when it strictly improves a held-out validation score** (`score_flow`
+  via an oracle agent through the executor), with a rejected-edit buffer and edit budget.
+  Candidates come from `detect_gaps` (a validation rollout needing an undefined outcome);
+  the gate uniquely selects the right target because downstream outcomes must also match.
+  CLI: `--flow`, `--scenarios`, `--out`, `--budget`, `--drop` (demo aid to create a gap).
 - `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
   `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
   compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /

@@ -130,6 +130,26 @@ python eval/run_eval.py --check    # also fails CI unless compiled beats baselin
 Representative result (10 scenarios, 4 SOPs): illegal-action rate **28% → 0%**,
 correct-end rate **60% → 100%**, all illegal attempts blocked by the executor.
 
+## Structured self-evolution (optimizer)
+
+`optimizer.py` evolves a `flow.json` the way SkillOpt evolves a `SKILL.md` — but with
+**bounded, typed graph edits** instead of free text. It detects adherence gaps (a
+validation rollout that needs an outcome the graph doesn't define), proposes candidate
+edits, and accepts one **only when it strictly improves a held-out validation score**
+(scored by running an oracle agent through the executor). Wrong candidates go into a
+rejected-edit buffer; an edit budget bounds the change. No LLM/API required.
+
+```bash
+# demo: drop a real branch, then watch the optimizer re-discover and re-add it
+python optimizer.py --flow skills/tool_fault_investigation/flow.json \
+  --drop "check_lot_exposure=exposed lots are found"
+```
+
+The validation gate uniquely selects the correct target (e.g. `review_process_data`)
+because the rest of the scenario's outcome chain must also resolve — a wrong target
+fails downstream and scores lower. Every accepted edit is a schema-valid, auditable
+graph operation.
+
 ## Tests
 
 ```bash

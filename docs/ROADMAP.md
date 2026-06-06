@@ -20,7 +20,7 @@
 | **M0 單一事實來源 + 測試** ✅ | golden snapshot（`parser.py` ↔ committed skills）+ parity（`parser.py` ↔ `index.html` JS，Node 執行），接進 CI（PR 也跑） | 擋住兩套實作走鐘，讓後續迭代安全 | 小 |
 | **M1 executor MVP + eval** ✅ | 載入 `flow.json`、強制合法轉移、記錄 state history、設核准閘；用 eval 比較守步率 | **證明核心命題**，建立護城河 | 中 |
 | **M2 工具 I/O 契約進 schema** ✅ | 新增 `**Returns**` / `**Signal**` SOP 標註 → `returns` / `signal_field` 寫進 `flow.json`，SKILL.md 渲染 Response Interpretation，品質報告驗證 | 讓「Agent 知道怎麼判讀回傳」進到真正的產物，而非只在 demo | 中 |
-| **M2.5 結構化自我演化（SkillOpt 對位）** | 用 rollout 回饋對 `flow.json` 做**有界圖編輯**（補分支、收緊條件、設閘），只在 held-out 守步率提升時接受 | 對應 SkillOpt 的核心方法，但作用在**受控狀態圖**而非自由文字 → 我們的差異化主打 | 大 |
+| **M2.5 結構化自我演化（SkillOpt 對位）** ✅ | `optimizer.py`：對 `flow.json` 做**有界圖編輯**（add_transition / set_signal_field），只在 held-out 驗證分數嚴格提升時接受，含 rejected-edit buffer 與 edit budget | 對應 SkillOpt 的核心方法，但作用在**受控狀態圖**而非自由文字 → 我們的差異化主打 | 大 |
 | **M3 漏斗與正確性** | 實作 tKMS 匯入、修非 ASCII id、executor 接真實 MCP | 打通真正的匯入路徑與真實整合 | 中 |
 | **M4 企業就緒** | SOP 版本控管、閘門核准、稽核、RBAC、執行可觀測性 | 受監管環境的落地門檻 | 大 |
 
