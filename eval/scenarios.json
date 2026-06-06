@@ -1,0 +1,132 @@
+{
+  "description": "Held-out evaluation scenarios for the SOP executor. Each scenario fixes a real-world 'situation' (the correct outcome at every decision the correct path visits) and the expected terminal state. The eval drives the same noisy agent policy through (a) raw markdown with no enforcement and (b) the flow.json executor, and compares step-adherence.",
+  "error_rate": 0.35,
+  "seed": 7,
+  "scenarios": [
+    {
+      "name": "tool_fault: confirmed fault, exposed lots, process excursion -> MRB",
+      "flow": "skills/tool_fault_investigation/flow.json",
+      "split": "dev",
+      "expected_end_state": "open_mrb_case",
+      "situation": {
+        "confirm_fault_event": "fault event is confirmed",
+        "place_tool_on_hold": "hold is applied successfully",
+        "check_lot_exposure": "exposed lots are found",
+        "review_process_data": "process excursion is detected"
+      }
+    },
+    {
+      "name": "tool_fault: confirmed fault, no exposure, root cause found -> release",
+      "flow": "skills/tool_fault_investigation/flow.json",
+      "split": "dev",
+      "expected_end_state": "release_tool_to_production",
+      "situation": {
+        "confirm_fault_event": "fault event is confirmed",
+        "place_tool_on_hold": "hold is applied successfully",
+        "check_lot_exposure": "no exposed lots are found",
+        "run_equipment_diagnostics": "root cause is identified",
+        "create_corrective_action": "corrective action is approved",
+        "verify_tool_recovery": "verification passes"
+      }
+    },
+    {
+      "name": "tool_fault: false alarm -> documented",
+      "flow": "skills/tool_fault_investigation/flow.json",
+      "split": "holdout",
+      "expected_end_state": "document_no_fault_found",
+      "situation": {
+        "confirm_fault_event": "event is duplicate or false alarm"
+      }
+    },
+    {
+      "name": "tool_fault: no root cause -> escalate",
+      "flow": "skills/tool_fault_investigation/flow.json",
+      "split": "holdout",
+      "expected_end_state": "escalate_to_equipment_engineering",
+      "situation": {
+        "confirm_fault_event": "fault event is confirmed",
+        "place_tool_on_hold": "hold is applied successfully",
+        "check_lot_exposure": "no exposed lots are found",
+        "run_equipment_diagnostics": "root cause is not identified"
+      }
+    },
+    {
+      "name": "furnace: drift confirmed, exposed lots, metrology excursion -> MRB",
+      "flow": "skills/furnace_temperature_drift/flow.json",
+      "split": "dev",
+      "expected_end_state": "open_mrb_case",
+      "situation": {
+        "confirm_temperature_drift_event": "drift is confirmed",
+        "place_furnace_on_hold": "hold is applied successfully",
+        "identify_exposed_lots": "exposed lots are found",
+        "review_metrology_impact": "metrology excursion is detected"
+      }
+    },
+    {
+      "name": "furnace: drift confirmed, recovery verified -> release",
+      "flow": "skills/furnace_temperature_drift/flow.json",
+      "split": "holdout",
+      "expected_end_state": "release_furnace_to_production",
+      "situation": {
+        "confirm_temperature_drift_event": "drift is confirmed",
+        "place_furnace_on_hold": "hold is applied successfully",
+        "identify_exposed_lots": "no exposed lots are found",
+        "run_furnace_diagnostics": "root cause is identified",
+        "create_corrective_action": "corrective action is approved",
+        "verify_furnace_recovery": "verification passes"
+      }
+    },
+    {
+      "name": "coater: defect confirmed, material issue -> MRB",
+      "flow": "skills/photoresist_coater_defect/flow.json",
+      "split": "dev",
+      "expected_end_state": "open_mrb_case",
+      "situation": {
+        "confirm_defect_signal": "coating defect is confirmed",
+        "hold_affected_tool_and_lots": "containment is complete",
+        "review_coater_process_data": "no abnormal process signal is found",
+        "review_material_history": "material issue is suspected"
+      }
+    },
+    {
+      "name": "coater: equipment issue, recovery verified -> release",
+      "flow": "skills/photoresist_coater_defect/flow.json",
+      "split": "holdout",
+      "expected_end_state": "release_coater_to_production",
+      "situation": {
+        "confirm_defect_signal": "coating defect is confirmed",
+        "hold_affected_tool_and_lots": "containment is complete",
+        "review_coater_process_data": "abnormal process signal is found",
+        "run_coater_diagnostics": "equipment issue is identified",
+        "create_corrective_action": "corrective action is approved",
+        "verify_coater_recovery": "verification passes"
+      }
+    },
+    {
+      "name": "auto-notify (MCP): anomaly confirmed, owner acknowledges -> hand off",
+      "flow": "skills/tool_anomaly_auto_notification/flow.json",
+      "split": "dev",
+      "expected_end_state": "hand_off_to_owner",
+      "situation": {
+        "detect_anomaly_event": "anomaly is confirmed",
+        "place_tool_on_hold": "hold is applied successfully",
+        "create_tracking_ticket": "ticket is created",
+        "notify_oncall_owner": "notification is delivered",
+        "confirm_owner_acknowledgement": "owner acknowledges in time"
+      }
+    },
+    {
+      "name": "auto-notify (MCP): ack times out -> escalate",
+      "flow": "skills/tool_anomaly_auto_notification/flow.json",
+      "split": "holdout",
+      "expected_end_state": "escalate_to_equipment_engineering",
+      "situation": {
+        "detect_anomaly_event": "anomaly is confirmed",
+        "place_tool_on_hold": "hold is applied successfully",
+        "create_tracking_ticket": "ticket is created",
+        "notify_oncall_owner": "notification is delivered",
+        "confirm_owner_acknowledgement": "acknowledgement times out"
+      }
+    }
+  ]
+}
