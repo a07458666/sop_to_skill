@@ -154,6 +154,8 @@ class SkillExecutor:
             "tool_kind": state.tool_kind,
             "mcp_server": state.mcp_server,
             "parameters": list(state.parameters or []),
+            "returns": list(state.returns or []),
+            "signal_field": state.signal_field,
             "requires_approval": self.requires_approval(),
             "approved": self.is_approved(),
             "allowed_outcomes": self.allowed_transitions(),

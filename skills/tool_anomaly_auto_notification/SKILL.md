@@ -35,6 +35,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Tool Anomaly Auto-Notif
 - **Description**: Review the tool alarm, MES event, and timestamp to confirm a real anomaly occurred rather than a duplicate or false alarm.
 - **Tool**: `mes_event_lookup` (Parameters: tool_id, event_time)
 - **Integration**: `API`
+- **Returns**: `event_id`, `alarm_code`, `event_count`, `is_duplicate`, `severity`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `is_duplicate`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `anomaly is confirmed` -> transition to `place_tool_on_hold`
   - If outcome is `event is a false alarm` -> transition to `document_no_fault_found`
@@ -43,6 +45,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Tool Anomaly Auto-Notif
 - **Description**: Stop new wafer starts and place the affected tool under engineering hold through the equipment automation API.
 - **Tool**: `eap_tool_hold` (Parameters: tool_id, hold_reason)
 - **Integration**: `API`
+- **Returns**: `hold_id`, `applied`, `eqp_state`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `applied`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `hold is applied successfully` -> transition to `create_tracking_ticket`
   - If outcome is `hold cannot be applied` -> transition to `escalate_to_equipment_engineering`
@@ -51,6 +55,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Tool Anomaly Auto-Notif
 - **Description**: Open a tracking ticket for the anomaly so the investigation has an auditable record and an owner.
 - **Tool**: `mcp__jira__create_issue` (Parameters: project_key, summary, severity)
 - **Integration**: `MCP` (server: `jira`)
+- **Returns**: `issue_key`, `url`, `created`, `status`
+- **Response Interpretation**: verify the `isError` flag (true ⇒ failure branch), read `structuredContent`, inspect `created`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `ticket is created` -> transition to `notify_oncall_owner`
   - If outcome is `ticket creation fails` -> transition to `escalate_to_equipment_engineering`
@@ -59,6 +65,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Tool Anomaly Auto-Notif
 - **Description**: Post the anomaly summary and ticket link to the equipment on-call channel so the responsible engineer is paged.
 - **Tool**: `mcp__slack__post_message` (Parameters: channel, message)
 - **Integration**: `MCP` (server: `slack`)
+- **Returns**: `ts`, `delivered`, `channel_id`
+- **Response Interpretation**: verify the `isError` flag (true ⇒ failure branch), read `structuredContent`, inspect `delivered`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `notification is delivered` -> transition to `confirm_owner_acknowledgement`
   - If outcome is `notification fails` -> transition to `escalate_to_equipment_engineering`
@@ -67,6 +75,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Tool Anomaly Auto-Notif
 - **Description**: Poll the on-call acknowledgement status to confirm the engineer has accepted ownership of the ticket within the response window.
 - **Tool**: `oncall_ack_status` (Parameters: ticket_id, timeout_minutes)
 - **Integration**: `API`
+- **Returns**: `ack_state`, `ack_latency_min`, `owner`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `ack_state`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `owner acknowledges in time` -> transition to `hand_off_to_owner`
   - If outcome is `acknowledgement times out` -> transition to `escalate_to_equipment_engineering`

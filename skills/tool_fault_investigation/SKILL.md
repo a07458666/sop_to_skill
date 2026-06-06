@@ -34,6 +34,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Review the tool alarm, operator report, MES event, and timestamp to confirm that a real equipment fault occurred.
 - **Tool**: `mes_event_lookup` (Parameters: tool_id, event_time)
 - **Integration**: `API`
+- **Returns**: `event_id`, `alarm_code`, `event_count`, `is_duplicate`, `severity`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `is_duplicate`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `fault event is confirmed` -> transition to `place_tool_on_hold`
   - If outcome is `event is duplicate or false alarm` -> transition to `document_no_fault_found`
@@ -42,6 +44,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Stop further wafer starts on the affected tool and place the tool in engineering hold while investigation is active.
 - **Tool**: `tool_hold_request` (Parameters: tool_id, hold_reason)
 - **Integration**: `API`
+- **Returns**: `hold_id`, `applied`, `eqp_state`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `applied`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `hold is applied successfully` -> transition to `check_lot_exposure`
   - If outcome is `hold cannot be applied` -> transition to `escalate_to_equipment_engineering`
@@ -50,6 +54,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Identify affected lots, wafers, recipes, chambers, and time windows that may have been exposed to the fault condition.
 - **Tool**: `lot_history_query` (Parameters: tool_id, event_time, lookback_hours)
 - **Integration**: `API`
+- **Returns**: `exposed_lot_count`, `lot_ids`, `wafer_count`, `window`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `exposed_lot_count`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `exposed lots are found` -> transition to `review_process_data`
   - If outcome is `no exposed lots are found` -> transition to `run_equipment_diagnostics`
@@ -58,6 +64,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Review SPC charts, sensor traces, metrology results, and recipe parameters for excursions linked to the fault window.
 - **Tool**: `process_data_review` (Parameters: lot_ids, tool_id, recipe_id)
 - **Integration**: `API`
+- **Returns**: `spc_violations`, `min_cpk`, `excursion_detected`, `metrology_oos`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `excursion_detected`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `process excursion is detected` -> transition to `open_mrb_case`
   - If outcome is `no process excursion is detected` -> transition to `run_equipment_diagnostics`
@@ -66,6 +74,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Execute equipment diagnostics, review PM status, check chamber health, and inspect relevant hardware or subsystem logs.
 - **Tool**: `equipment_diagnostics` (Parameters: tool_id, chamber_id)
 - **Integration**: `API`
+- **Returns**: `diag_code`, `subsystem`, `root_cause_found`, `error_lines`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `root_cause_found`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `root cause is identified` -> transition to `create_corrective_action`
   - If outcome is `root cause is not identified` -> transition to `escalate_to_equipment_engineering`
@@ -74,6 +84,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Define corrective action, repair plan, verification requirement, and tool release criteria.
 - **Tool**: `corrective_action_create` (Parameters: tool_id, root_cause, action_owner)
 - **Integration**: `API`
+- **Returns**: `ca_id`, `approval_state`, `owner`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `approval_state`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `corrective action is approved` -> transition to `verify_tool_recovery`
   - If outcome is `corrective action is rejected` -> transition to `escalate_to_equipment_engineering`
@@ -82,6 +94,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Description**: Run qualification checks, golden wafer validation, or monitor lot review before releasing the tool back to production.
 - **Tool**: `tool_recovery_verify` (Parameters: tool_id, qualification_plan)
 - **Integration**: `API`
+- **Returns**: `qual_result`, `golden_wafer_pass`, `monitor_cpk`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `qual_result`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `verification passes` -> transition to `release_tool_to_production`
   - If outcome is `verification fails` -> transition to `escalate_to_equipment_engineering`

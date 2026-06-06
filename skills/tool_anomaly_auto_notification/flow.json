@@ -13,6 +13,14 @@
         "tool_id",
         "event_time"
       ],
+      "returns": [
+        "event_id",
+        "alarm_code",
+        "event_count",
+        "is_duplicate",
+        "severity"
+      ],
+      "signal_field": "is_duplicate",
       "next_states": {
         "anomaly is confirmed": "place_tool_on_hold",
         "event is a false alarm": "document_no_fault_found"
@@ -29,6 +37,12 @@
         "tool_id",
         "hold_reason"
       ],
+      "returns": [
+        "hold_id",
+        "applied",
+        "eqp_state"
+      ],
+      "signal_field": "applied",
       "next_states": {
         "hold is applied successfully": "create_tracking_ticket",
         "hold cannot be applied": "escalate_to_equipment_engineering"
@@ -46,6 +60,13 @@
         "summary",
         "severity"
       ],
+      "returns": [
+        "issue_key",
+        "url",
+        "created",
+        "status"
+      ],
+      "signal_field": "created",
       "next_states": {
         "ticket is created": "notify_oncall_owner",
         "ticket creation fails": "escalate_to_equipment_engineering"
@@ -62,6 +83,12 @@
         "channel",
         "message"
       ],
+      "returns": [
+        "ts",
+        "delivered",
+        "channel_id"
+      ],
+      "signal_field": "delivered",
       "next_states": {
         "notification is delivered": "confirm_owner_acknowledgement",
         "notification fails": "escalate_to_equipment_engineering"
@@ -78,6 +105,12 @@
         "ticket_id",
         "timeout_minutes"
       ],
+      "returns": [
+        "ack_state",
+        "ack_latency_min",
+        "owner"
+      ],
+      "signal_field": "ack_state",
       "next_states": {
         "owner acknowledges in time": "hand_off_to_owner",
         "acknowledgement times out": "escalate_to_equipment_engineering"
@@ -91,6 +124,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -101,6 +136,8 @@
       "tool_kind": "mcp",
       "mcp_server": "slack",
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -111,6 +148,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     }
   ]

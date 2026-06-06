@@ -53,20 +53,39 @@ The detected `tool_kind` and `mcp_server` are written into `flow.json`, grouped 
 `## Tools Required` in `SKILL.md`, and surfaced in the web visualizer and execution simulator.
 See `sop_rule.md` for the full authoring rules.
 
+### Output contract: Returns & Signal
+
+A tool step can also declare what the tool **returns** and which field drives the
+decision, so the response-interpretation rule lives in the compiled artifact (not just
+the demo):
+
+- **Returns** — the output fields: `**Returns**: \`exposed_lot_count\`, \`lot_ids\`, \`wafer_count\``
+- **Signal** — the primary field the agent inspects to pick a branch (should be one of
+  Returns): `**Signal**: \`exposed_lot_count\``
+
+These are written into `flow.json` (`returns`, `signal_field`) and rendered in `SKILL.md`
+as a **Response Interpretation** line per tool state, e.g.:
+
+> **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read
+> `body.data`, inspect `exposed_lot_count`, then match the outcome against a branch below.
+
+Both fields are optional; when missing, the quality report adds a (non-blocking) suggestion.
+
 ### Integration validation & response interpretation
 
-`sop_quality_report.md` now includes an **`## API / MCP 整合驗證`** table that validates,
-per tool state: the parameter contract (does the agent know what to send?), the number of
-distinguishable response branches (can the agent route on the result?), and — for MCP tools —
-that an `mcp_server` could be resolved (so it can be mounted). It also lists the MCP servers
-that must be mounted before execution.
+`sop_quality_report.md` includes an **`## API / MCP 整合驗證`** table that validates,
+per tool state: the parameter contract (does the agent know what to send?), the declared
+**Returns**/**Signal** output contract (does it know what comes back and what to read?),
+the number of distinguishable response branches (can the agent route on the result?), and —
+for MCP tools — that an `mcp_server` could be resolved (so it can be mounted). It also lists
+the MCP servers that must be mounted before execution.
 
 Each tool state's branch conditions act as the agent's **response-interpretation rules**:
 
-- **API**: verify the HTTP `status` (non-2xx ⇒ failure branch), then read `body.result`
-  and match it against the state's branch conditions.
-- **MCP**: check the `isError` flag, then read `structuredContent.outcome` and match it
-  against the branch conditions.
+- **API**: verify the HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect the
+  `signal_field`, and match it against the state's branch conditions.
+- **MCP**: check the `isError` flag, read `structuredContent`, inspect the `signal_field`, and
+  match it against the branch conditions.
 
 The web demo (`index.html`) makes this interactive: a **MCP Server 掛載** panel lets you
 mount/unmount the servers referenced by the SOP (MCP tool calls are blocked until mounted),

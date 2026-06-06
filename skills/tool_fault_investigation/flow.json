@@ -13,6 +13,14 @@
         "tool_id",
         "event_time"
       ],
+      "returns": [
+        "event_id",
+        "alarm_code",
+        "event_count",
+        "is_duplicate",
+        "severity"
+      ],
+      "signal_field": "is_duplicate",
       "next_states": {
         "fault event is confirmed": "place_tool_on_hold",
         "event is duplicate or false alarm": "document_no_fault_found"
@@ -29,6 +37,12 @@
         "tool_id",
         "hold_reason"
       ],
+      "returns": [
+        "hold_id",
+        "applied",
+        "eqp_state"
+      ],
+      "signal_field": "applied",
       "next_states": {
         "hold is applied successfully": "check_lot_exposure",
         "hold cannot be applied": "escalate_to_equipment_engineering"
@@ -46,6 +60,13 @@
         "event_time",
         "lookback_hours"
       ],
+      "returns": [
+        "exposed_lot_count",
+        "lot_ids",
+        "wafer_count",
+        "window"
+      ],
+      "signal_field": "exposed_lot_count",
       "next_states": {
         "exposed lots are found": "review_process_data",
         "no exposed lots are found": "run_equipment_diagnostics"
@@ -63,6 +84,13 @@
         "tool_id",
         "recipe_id"
       ],
+      "returns": [
+        "spc_violations",
+        "min_cpk",
+        "excursion_detected",
+        "metrology_oos"
+      ],
+      "signal_field": "excursion_detected",
       "next_states": {
         "process excursion is detected": "open_mrb_case",
         "no process excursion is detected": "run_equipment_diagnostics"
@@ -79,6 +107,13 @@
         "tool_id",
         "chamber_id"
       ],
+      "returns": [
+        "diag_code",
+        "subsystem",
+        "root_cause_found",
+        "error_lines"
+      ],
+      "signal_field": "root_cause_found",
       "next_states": {
         "root cause is identified": "create_corrective_action",
         "root cause is not identified": "escalate_to_equipment_engineering"
@@ -96,6 +131,12 @@
         "root_cause",
         "action_owner"
       ],
+      "returns": [
+        "ca_id",
+        "approval_state",
+        "owner"
+      ],
+      "signal_field": "approval_state",
       "next_states": {
         "corrective action is approved": "verify_tool_recovery",
         "corrective action is rejected": "escalate_to_equipment_engineering"
@@ -112,6 +153,12 @@
         "tool_id",
         "qualification_plan"
       ],
+      "returns": [
+        "qual_result",
+        "golden_wafer_pass",
+        "monitor_cpk"
+      ],
+      "signal_field": "qual_result",
       "next_states": {
         "verification passes": "release_tool_to_production",
         "verification fails": "escalate_to_equipment_engineering"
@@ -125,6 +172,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -135,6 +184,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -145,6 +196,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -155,6 +208,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     }
   ]

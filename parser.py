@@ -85,6 +85,14 @@ class State(BaseModel):
         default=None,
         description="List of parameter names required by the tool (e.g., ['tool_id', 'event_time'])."
     )
+    returns: Optional[List[str]] = Field(
+        default=None,
+        description="Output field names the tool returns (e.g., ['exposed_lot_count', 'lot_ids']). Null when the step calls no tool or the contract is unknown."
+    )
+    signal_field: Optional[str] = Field(
+        default=None,
+        description="The primary response field the agent inspects to choose a branch (e.g. 'exposed_lot_count'). Should be one of `returns`. Null when not applicable."
+    )
     next_states: Optional[Dict[str, str]] = Field(
         default=None,
         description="Mapping of transition keys (e.g. 'success', 'failure', 'true', 'false') to target state IDs. Empty for end_states."
@@ -198,11 +206,23 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
                 issues.append("MCP server 未指定")
                 findings.append(f"MCP 工具 `{state.tool}` 未能解析出 server 名稱，執行前無法掛載。")
                 suggestions.append("使用 `mcp__<server>__<tool>` 命名或加上 `(MCP: server)` 標註。")
+        # Output contract (non-blocking): does the agent know what comes back and what to read?
+        if state.type != "end_state" and not state.returns:
+            suggestions.append(
+                f"為 `{state.id}` 補上 **Returns** 宣告（工具回傳欄位），讓 Agent 知道可判讀哪些值。"
+            )
+        if state.returns and state.signal_field and state.signal_field not in state.returns:
+            findings.append(
+                f"工具 state `{state.id}` 的 **Signal** `{state.signal_field}` 不在宣告的 **Returns** 欄位中。"
+            )
+            suggestions.append(f"將 `{state.id}` 的 Signal 改為 Returns 內的欄位，或補進 Returns。")
         integration_rows.append({
             "id": state.id,
             "kind": kind,
             "server": state.mcp_server or "",
             "params": len(state.parameters or []),
+            "returns": len(state.returns or []),
+            "signal": state.signal_field or "",
             "outcomes": len(outcomes),
             "ok": not issues,
             "issues": issues,
@@ -236,28 +256,32 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
 
     report += "\n## API / MCP 整合驗證\n\n"
     if integration_rows:
-        report += "| State | 整合 | Server | Params | 回傳分支 | 驗證 |\n"
-        report += "| --- | --- | --- | --- | --- | --- |\n"
+        report += "| State | 整合 | Server | Params | Returns | Signal | 回傳分支 | 驗證 |\n"
+        report += "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
         for row in integration_rows:
             server_cell = f"`{row['server']}`" if row["server"] else "-"
+            signal_cell = f"`{row['signal']}`" if row["signal"] else "-"
             verdict = "✅ 通過" if row["ok"] else "⚠️ " + "、".join(row["issues"])
-            report += f"| `{row['id']}` | {row['kind']} | {server_cell} | {row['params']} | {row['outcomes']} | {verdict} |\n"
+            report += (
+                f"| `{row['id']}` | {row['kind']} | {server_cell} | {row['params']} | "
+                f"{row['returns']} | {signal_cell} | {row['outcomes']} | {verdict} |\n"
+            )
         if mcp_servers_needed:
             servers = "、".join(f"`{server}`" for server in sorted(mcp_servers_needed))
             report += f"\n執行前需掛載的 MCP server：{servers}。\n"
         else:
             report += "\n此 SOP 未使用 MCP 工具（皆為 API 呼叫）。\n"
         report += (
-            "\n每個工具 state 的回傳分支即為 Agent 的「回傳判讀規則」："
-            "API 依 HTTP `status` 與 `body.result`、MCP 依 `isError` 與 "
-            "`structuredContent.outcome` 比對分支後決定下一步。\n"
+            "\n每個工具 state 的「回傳判讀規則」由 **Returns**（回傳欄位）、**Signal**（主要判讀欄位）"
+            "與回傳分支共同構成：API 先驗 HTTP `status`、讀 `body.data`，MCP 先驗 `isError`、讀 "
+            "`structuredContent`，再依 Signal 欄位值比對分支後決定下一步。\n"
         )
     else:
         report += "- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n"
 
     if rules_content:
         report += "\n## 規則摘要\n\n"
-        report += "本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳判讀規則、MCP server 掛載需求）。\n"
+        report += "本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳欄位 Returns、判讀欄位 Signal、回傳判讀規則、MCP server 掛載需求）。\n"
 
     return report
 
@@ -341,6 +365,8 @@ def offline_fallback_parse(content: str) -> dict:
         tool_kind = None
         mcp_server = None
         params = []
+        returns = []
+        signal_field = None
         next_states = {}
 
         # Parse section details
@@ -360,6 +386,12 @@ def offline_fallback_parse(content: str) -> dict:
                     params = param_matches[1:]
 
                 tool_kind, mcp_server = detect_tool_meta(tool, tool_part)
+            elif re.match(r"[-*]\s+\*\*Returns\*\*:", line_str, re.IGNORECASE):
+                returns = re.findall(r"`([^`]+)`", line_str)
+            elif re.match(r"[-*]\s+\*\*Signal\*\*:", line_str, re.IGNORECASE):
+                signal_match = re.search(r"`([^`]+)`", line_str)
+                if signal_match:
+                    signal_field = signal_match.group(1)
             elif "If " in line_str:
                 # Basic parsing for branching conditions
                 cond_match = re.search(r"\*\*If\s+([^:]+)\*\*:\s*(.+)", line_str)
@@ -383,6 +415,8 @@ def offline_fallback_parse(content: str) -> dict:
             "tool_kind": tool_kind,
             "mcp_server": mcp_server,
             "parameters": params if params else None,
+            "returns": returns if returns else None,
+            "signal_field": signal_field,
             "next_states": next_states if next_states else None
         })
 
@@ -482,6 +516,18 @@ def generate_skill_md(flow_data: StateMachine) -> str:
                 if s.tool_kind == "mcp" and s.mcp_server:
                     integration += f" (server: `{s.mcp_server}`)"
                 instructions += integration + "\n"
+            if s.returns:
+                instructions += f"- **Returns**: {', '.join('`' + r + '`' for r in s.returns)}\n"
+            if s.next_states:
+                if s.tool_kind == "mcp":
+                    check, channel = "the `isError` flag (true ⇒ failure branch)", "`structuredContent`"
+                else:
+                    check, channel = "HTTP `status` (non-2xx ⇒ failure branch)", "`body.data`"
+                signal = f", inspect `{s.signal_field}`" if s.signal_field else ""
+                instructions += (
+                    f"- **Response Interpretation**: verify {check}, read {channel}{signal}, "
+                    "then match the outcome against a branch below.\n"
+                )
         if s.next_states:
             instructions += "- **Branching / Next States**:\n"
             for cond, target in s.next_states.items():
@@ -573,6 +619,8 @@ Extract all states, transitions, tools, parameters, and ensure that:
 4. Terminal/end states have `next_states` set to null or empty.
 5. For each tool, set `tool_kind` to 'mcp' when the SOP marks it with `(MCP)` / `(MCP: server)` or the tool name uses the `mcp__<server>__<tool>` convention; otherwise set it to 'api'. Leave `tool_kind` null for pure decision states with no tool.
 6. For MCP tools, set `mcp_server` to the server name (e.g. the segment between `mcp__` and the next `__`, or the value given in `(MCP: server)`). Leave `mcp_server` null for API tools.
+7. Set `returns` to the list of output field names the tool returns, taken from the step's `**Returns**` line (backtick-quoted field names). Leave null when no `**Returns**` is given or the step calls no tool.
+8. Set `signal_field` to the single primary field the agent inspects to choose a branch, taken from the step's `**Signal**` line. It should be one of `returns`. Leave null when not specified.
 """
 
             response = client.models.generate_content(

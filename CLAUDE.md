@@ -54,8 +54,9 @@ Output Skill bundle per SOP:
 
 A SOP compiles to a state machine. Each `State` has: `id`, `type`
 (`action` | `decision` | `end_state`), `description`, `tool`, `tool_kind`
-(`api` | `mcp` | null), `mcp_server`, `parameters`, `next_states`
-(map of free-text outcome → target state id).
+(`api` | `mcp` | null), `mcp_server`, `parameters` (input fields), `returns`
+(output fields), `signal_field` (the primary output field the agent reads to route),
+`next_states` (map of free-text outcome → target state id).
 
 ### API vs MCP tools (SOP annotation)
 In a `**System/Tool**` line, declare the integration:
@@ -66,10 +67,18 @@ In a `**System/Tool**` line, declare the integration:
   segment between `mcp__` and the next `__`, or the `(MCP: server)` value.
 - Implemented identically in `parser.py:detect_tool_meta` and `index.html:detectToolMeta`.
 
+### Output contract: Returns / Signal (M2)
+A tool step may declare its output contract in the SOP markdown:
+- `**Returns**: \`f1\`, \`f2\`` → `returns` (output field names).
+- `**Signal**: \`f1\`` → `signal_field` (the field the agent inspects to route; should be in `returns`).
+Parsed identically in `parser.py` and `index.html:compileMarkdownToFlow`, written into
+`flow.json`, rendered as a **Response Interpretation** line in `SKILL.md`, and validated
+(non-blocking) in the quality report's integration table (Returns/Signal columns).
+
 ### Response interpretation (how the agent routes)
 Each state's `next_states` keys are the agent's **response-interpretation rules**:
-- API: check HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, match a branch.
-- MCP: check `isError`, read `structuredContent`, match a branch.
+- API: check HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `signal_field`, match a branch.
+- MCP: check `isError`, read `structuredContent`, inspect `signal_field`, match a branch.
 Surfaced in the node inspector, simulator, and quality report.
 
 ## Web demo concepts (index.html)

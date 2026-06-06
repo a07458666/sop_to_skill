@@ -34,6 +34,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Review furnace alarm history, recipe setpoint, actual temperature trace, and event timestamp to confirm the drift condition.
 - **Tool**: `furnace_alarm_lookup` (Parameters: tool_id, event_time)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `drift is confirmed` -> transition to `place_furnace_on_hold`
   - If outcome is `drift is not confirmed` -> transition to `document_no_fault_found`
@@ -42,6 +43,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Stop new lots from entering the furnace and place the equipment under engineering hold.
 - **Tool**: `tool_hold_request` (Parameters: tool_id, hold_reason)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `hold is applied successfully` -> transition to `identify_exposed_lots`
   - If outcome is `hold cannot be applied` -> transition to `escalate_to_equipment_engineering`
@@ -50,6 +52,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Query lot history to identify wafers processed during the temperature drift window.
 - **Tool**: `lot_history_query` (Parameters: tool_id, event_time, lookback_hours)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `exposed lots are found` -> transition to `review_metrology_impact`
   - If outcome is `no exposed lots are found` -> transition to `run_furnace_diagnostics`
@@ -58,6 +61,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Review film thickness, uniformity, oxide growth rate, and SPC trends for exposed lots.
 - **Tool**: `metrology_review` (Parameters: lot_ids, measurement_type)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `metrology excursion is detected` -> transition to `open_mrb_case`
   - If outcome is `no metrology excursion is detected` -> transition to `run_furnace_diagnostics`
@@ -66,6 +70,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Check thermocouple calibration, heater zone status, gas flow stability, and controller logs.
 - **Tool**: `furnace_diagnostics` (Parameters: tool_id, zone_id)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `root cause is identified` -> transition to `create_corrective_action`
   - If outcome is `root cause is not identified` -> transition to `escalate_to_equipment_engineering`
@@ -74,6 +79,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Define repair action, post-maintenance qualification, owner, and release criteria.
 - **Tool**: `corrective_action_create` (Parameters: tool_id, root_cause, action_owner)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `corrective action is approved` -> transition to `verify_furnace_recovery`
   - If outcome is `corrective action is rejected` -> transition to `escalate_to_equipment_engineering`
@@ -82,6 +88,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Furnace Temperature Dri
 - **Description**: Run qualification recipe and confirm temperature stability before production release.
 - **Tool**: `tool_recovery_verify` (Parameters: tool_id, qualification_plan)
 - **Integration**: `API`
+- **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, then match the outcome against a branch below.
 - **Branching / Next States**:
   - If outcome is `verification passes` -> transition to `release_furnace_to_production`
   - If outcome is `verification fails` -> transition to `escalate_to_equipment_engineering`
