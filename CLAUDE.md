@@ -22,6 +22,17 @@ Output Skill bundle per SOP:
   Gemini path (`GEMINI_API_KEY`) and an **offline heuristic fallback** parser
   (`offline_fallback_parse`) used when no key is set. Emits the Skill bundle.
   `assess_sop_quality()` builds the quality report including the API/MCP validation table.
+- `executor.py` — the **runtime enforcement layer** (M1). `SkillExecutor` loads a
+  `flow.json` (reusing the parser's schema) and enforces it as an execution contract:
+  legal-only tool calls + outcomes, human-in-the-loop **approval gates** (inferred via
+  `DEFAULT_APPROVAL_KEYWORDS`, e.g. hold/escalate/release), and a serializable audit trail.
+  CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`.
+- `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
+  `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
+  compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /
+  correct-end rates; writes `eval/results.md`. `--check` gates CI. Methodology aligned with
+  SkillOpt (see `docs/ROADMAP.md`).
+- `tests/` — pytest suite for executor behaviour and the eval invariant.
 - `index.html` — a single-file interactive web demo (GitHub Pages). It re-implements
   the compiler in JS (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`)
   to stay at **parity with `parser.py`**, plus the flow visualizer, MCP mount panel,
@@ -30,8 +41,9 @@ Output Skill bundle per SOP:
 - `examples/` — more SOPs incl. `tool_anomaly_auto_notification_sop.md` (mixed API+MCP).
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
-- `.github/workflows/ci-cd.yml` — CI: `ruff check parser.py` + `html-validate index.html`,
-  then GitHub Pages deploy on push to `main`.
+- `.github/workflows/ci-cd.yml` — CI: lint (`ruff check parser.py executor.py eval/ tests/`
+  + `html-validate index.html`), test (`pytest` + `eval/run_eval.py --check`), then GitHub
+  Pages deploy on push to `main`.
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
 
 ## Core model
@@ -88,7 +100,9 @@ Surfaced in the node inspector, simulator, and quality report.
 ## Verify before pushing
 
 ```bash
-ruff check parser.py
+ruff check parser.py executor.py eval/ tests/
+python3 -m pytest tests/ -q
+python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
 html-validate index.html
 # JS syntax check of the inline <script>:
 node -e 'const fs=require("fs");const h=fs.readFileSync("index.html","utf8");const re=/<script>([\s\S]*?)<\/script>/g;let m,l=null;while((m=re.exec(h)))l=m[1];fs.writeFileSync("/tmp/m.js",l)'; node --check /tmp/m.js
@@ -120,3 +134,6 @@ A lightweight DOM shim can `eval` the inline script to smoke-test the init path.
 - Done so far (merged to `main`): API/MCP integration + schema, quality-report
   integration validation, layered flow layout (crossing fix), MCP mount panel,
   SQL-like tool-call simulation with agent result interpretation.
+- On dev branch (M1, this work): `executor.py` enforcement layer + `eval/` harness +
+  `tests/`, CI test job, `docs/ROADMAP.md` (incl. SkillOpt positioning). Eval proves
+  illegal-action rate 28%→0% and correct-end 60%→100% (baseline vs compiled).

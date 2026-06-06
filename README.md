@@ -73,6 +73,50 @@ mount/unmount the servers referenced by the SOP (MCP tool calls are blocked unti
 and the **execution simulator** shows the simulated request payload, the verification rule,
 and the mock API/MCP response for each routing choice.
 
+## Executor: enforcing the flow at runtime
+
+Compiling a SOP produces a `flow.json`, but a `SKILL.md` only *asks* the agent to
+follow it. `executor.py` turns that graph into an **execution contract** that the
+agent cannot violate:
+
+- it only exposes the tool the current state declares (graph-external tool calls raise),
+- it only accepts an outcome the current state actually defines (unknown outcomes raise),
+- it blocks advancing past a **human-in-the-loop approval gate** until approved, and
+- it records every step into a serializable **audit trail**.
+
+```bash
+# interactive walk-through
+python executor.py --flow skills/tool_fault_investigation/flow.json
+
+# scripted, non-interactive, with audit trail
+python executor.py --flow skills/tool_fault_investigation/flow.json \
+  --steps "fault event is confirmed;hold is applied successfully;exposed lots are found;process excursion is detected" \
+  --auto-approve --audit
+```
+
+## Evaluation: does enforcement help?
+
+`eval/` measures the core thesis — *the same agent obeys the SOP far better under
+the executor than free-running over the raw markdown*. It runs a deterministic,
+intentionally-noisy agent through every held-out scenario in two modes (baseline =
+no enforcement, compiled = under the executor) and reports step-adherence. The
+methodology follows **SkillOpt** (arXiv 2605.23904): a held-out `dev`/`holdout`
+split with per-cell reporting, fully reproducible with no API key.
+
+```bash
+python eval/run_eval.py            # writes eval/results.md
+python eval/run_eval.py --check    # also fails CI unless compiled beats baseline
+```
+
+Representative result (10 scenarios, 4 SOPs): illegal-action rate **28% → 0%**,
+correct-end rate **60% → 100%**, all illegal attempts blocked by the executor.
+
+## Tests
+
+```bash
+python -m pytest tests/ -q
+```
+
 ## Example SOPs
 
 - `sample_sop.md`: semiconductor tool fault investigation.
