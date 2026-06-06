@@ -3,6 +3,8 @@ name: CI / CD
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -60,6 +62,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Install test dependencies
         run: pip install pydantic pytest
 
@@ -73,6 +80,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: [lint, test]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     environment:

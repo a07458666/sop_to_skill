@@ -32,7 +32,10 @@ Output Skill bundle per SOP:
   compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /
   correct-end rates; writes `eval/results.md`. `--check` gates CI. Methodology aligned with
   SkillOpt (see `docs/ROADMAP.md`).
-- `tests/` — pytest suite for executor behaviour and the eval invariant.
+- `tests/` — pytest suite: executor behaviour, the eval invariant, **golden
+  snapshots** (`parser.py` output must match the committed `skills/*` bundles), and
+  **parity** (`index.html` JS compiles SOPs to the same graph as `parser.py`, run
+  under Node — the guardrail against the two implementations drifting).
 - `index.html` — a single-file interactive web demo (GitHub Pages). It re-implements
   the compiler in JS (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`)
   to stay at **parity with `parser.py`**, plus the flow visualizer, MCP mount panel,
@@ -41,9 +44,10 @@ Output Skill bundle per SOP:
 - `examples/` — more SOPs incl. `tool_anomaly_auto_notification_sop.md` (mixed API+MCP).
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
-- `.github/workflows/ci-cd.yml` — CI: lint (`ruff check parser.py executor.py eval/ tests/`
-  + `html-validate index.html`), test (`pytest` + `eval/run_eval.py --check`), then GitHub
-  Pages deploy on push to `main`.
+- `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
+  lint (`ruff check parser.py executor.py eval/ tests/` + `html-validate index.html`),
+  test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
+  GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
 
 ## Core model
@@ -93,6 +97,7 @@ Surfaced in the node inspector, simulator, and quality report.
 
 - Keep `parser.py` (Python) and `index.html` (JS) **in sync** — they implement the
   same compile + quality logic; changing one usually means changing the other.
+  `tests/test_parity.py` enforces this for the compile path (structural graph).
 - When `parser.py` output changes, **regenerate the committed skills** (see below).
 - UI text is Traditional Chinese (zh-TW); code identifiers/tools are English.
 - Do not put the model identifier in commits/PRs/code.
