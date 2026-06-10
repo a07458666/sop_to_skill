@@ -47,6 +47,9 @@ Output Skill bundle per SOP:
   the compiler in JS (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`)
   to stay at **parity with `parser.py`**, plus the flow visualizer, MCP mount panel,
   and execution simulator. No build step; all inline.
+- `docs/PRODUCT.md` — product positioning (four-pillar loop: Compile/Enforce/Prove/Evolve,
+  SOP-as-Code, north-star metrics). `docs/ROADMAP.md` — schedule + acceptance criteria;
+  phase 1 (M0–M2.5) done, phase 2 is G1–G4 (G1 = executor as a real MCP server, first).
 - `sample_sop.md` — semiconductor tool fault investigation (English; default for CLI).
 - `examples/` — more SOPs incl. `tool_anomaly_auto_notification_sop.md` (mixed API+MCP).
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.

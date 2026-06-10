@@ -1,12 +1,16 @@
 # 開發路線圖 (ROADMAP)
 
-本文件把產品反思（見對話紀錄 / 可另存 `docs/PRODUCT_REVIEW.md`）收斂成可執行的開發計畫。
+本文件是開發排程與驗收標準的單一事實來源。產品定位、設計原則與北極星指標見 `docs/PRODUCT.md`。
 
-## 北極星與本階段目標
+## 北極星與階段目標
 
-**北極星：** 從「能編譯 SOP 的工具」進化成「**能在執行時強制流程的 Agent 治理層**」。
+**北極星：** 「**讓 AI Agent 可證明地照 SOP 做事，並讓 SOP 在治理下持續變好**」（詳見 `docs/PRODUCT.md`）。
 
-**本階段（下一步）要證明的命題：** 把 SOP 編譯成狀態機 + 一個 executor，能讓 Agent 的**守步率**顯著優於直接閱讀原始 markdown。在這點被數據證明之前，其餘功能都是錦上添花。
+**第一階段命題（✅ 已用數據證明）：** 把 SOP 編譯成狀態機 + executor，守步率顯著優於直接閱讀 markdown
+（非法動作 28%→0%、正確終點 60%→100%）。
+
+**第二階段命題（進行中）：** 同樣的保證對「**真實 agent + 真實介面**」成立，且守步缺口能在人類治理下
+閉環成 SOP 修訂。
 
 **貫穿原則：**
 1. 先還技術債（兩套平行實作）再加新功能，否則每個改動都要改兩遍。
@@ -21,8 +25,41 @@
 | **M1 executor MVP + eval** ✅ | 載入 `flow.json`、強制合法轉移、記錄 state history、設核准閘；用 eval 比較守步率 | **證明核心命題**，建立護城河 | 中 |
 | **M2 工具 I/O 契約進 schema** ✅ | 新增 `**Returns**` / `**Signal**` SOP 標註 → `returns` / `signal_field` 寫進 `flow.json`，SKILL.md 渲染 Response Interpretation，品質報告驗證 | 讓「Agent 知道怎麼判讀回傳」進到真正的產物，而非只在 demo | 中 |
 | **M2.5 結構化自我演化（SkillOpt 對位）** ✅ | `optimizer.py`：對 `flow.json` 做**有界圖編輯**（add_transition / set_signal_field），只在 held-out 驗證分數嚴格提升時接受，含 rejected-edit buffer 與 edit budget | 對應 SkillOpt 的核心方法，但作用在**受控狀態圖**而非自由文字 → 我們的差異化主打 | 大 |
-| **M3 漏斗與正確性** | 實作 tKMS 匯入、修非 ASCII id、executor 接真實 MCP | 打通真正的匯入路徑與真實整合 | 中 |
-| **M4 企業就緒** | SOP 版本控管、閘門核准、稽核、RBAC、執行可觀測性 | 受監管環境的落地門檻 | 大 |
+| ~~M3 漏斗與正確性~~ | ~~tKMS 匯入、非 ASCII id、真實 MCP~~ | **已被 G1–G4 取代**（2026-06 重新規劃，見下） | - |
+| ~~M4 企業就緒~~ | ~~版本控管、RBAC、可觀測性~~ | **已被 G4 取代** | - |
+
+## 第二階段開發目標（G1–G4，2026-06 重新規劃）
+
+依 `docs/PRODUCT.md` 的定位（四支柱閉環 + 真實化），下一階段按優先序：
+
+### G1 — executor 變成 MCP server（最高優先）
+讓**真實 agent**（Claude 等）透過 MCP 在 enforcement 下執行 SOP，終結「只是模擬」。
+- 範圍：`mcp_server.py` 以 MCP 協議曝露 executor —— tools 如 `sop_start`、`sop_current_state`
+  （回 description/tool/parameters/returns/signal/allowed_outcomes）、`sop_report_outcome`（驗 outcome、
+  推進狀態）、`sop_request_approval`、`sop_audit_trail`。Agent 的真實工具呼叫由它閘控代理或核驗。
+- 驗收：一個真實 Claude session 載入該 MCP server 後完整走完 sample SOP；嘗試跳步/非法 outcome
+  被擋的實錄；輸出完整稽核軌跡。
+- 規模：中。
+
+### G2 — 演化閉環：提案以「SOP diff」回到人類
+optimizer 的圖編輯反向渲染成 SOP markdown 修訂建議，人核准後重編譯——SOP 永遠是單一事實來源。
+- 範圍：flow 編輯 → markdown 段落 patch（`**If ...**:` 分支增補等）；提案/核准/拒絕的記錄格式。
+- 驗收：`--drop` 製造的缺口 → optimizer 提案 → 以 SOP diff 呈現 → 接受後重編譯且 golden 測試更新，
+  全程留有紀錄。
+- 規模：中。
+
+### G3 — 真實 LLM agent 守步率 eval
+把「28%→0%」從模擬升級為真模型對照（有/無 enforcement），讓核心主張可被外部驗證。
+- 範圍：eval 增加 LLM 模式（有 API key 時跑真模型，無 key 時 CI 維持確定性模式）；逐 cell 報告。
+- 驗收：`eval/results.md` 增加真模型 cell；CI 不依賴 API key 仍全綠。
+- 規模：中。依賴 G1 的介面設計。
+
+### G4 — 治理層（企業就緒）
+SOP registry（版本、狀態機 diff）、核准流（誰能放行哪些閘）、RBAC-lite、執行可觀測性。
+- 驗收：一份 SOP 的兩個版本可並存、回溯；每個核准有 actor 與時間戳；稽核可匯出。
+- 規模：大。最後做——前三者把價值做實，G4 把它包成企業可買的形狀。
+
+**優先序與依賴：** G1 → G3（用 G1 的真實路徑跑量測）→ G2 → G4。
 
 ## 推薦的下一步：M1 — `flow.json` executor MVP + eval harness
 
@@ -72,10 +109,11 @@
 
 ## 依賴與順序
 ```
-M0 (foundation) ──▶ M1 (executor + eval, 證明命題) ──▶ M2 (I/O schema) ──┬──▶ M3 (漏斗/真實 MCP) ──▶ M4 (治理)
-                                                                          └──▶ M2.5 (結構化自我演化, SkillOpt 對位)
+第一階段（✅ 完成）: M0 ──▶ M1 ──▶ M2 ──▶ M2.5
+第二階段（規劃）  : G1 (MCP executor server) ──▶ G3 (真實 agent eval)
+                    G2 (SOP diff 閉環)　G4 (治理層, 最後)
 ```
-建議：**M0 併入 M1 一起做**（先補最小測試再開發 executor），其餘依序。M2.5 依賴 M1 的 eval/executor 與 M2 的 I/O 契約就緒。
+第一階段已全數完成並 merge / 在 PR 中。第二階段由 G1 開跑。
 
 ## 相關工作對位：SkillOpt（arXiv 2605.23904）
 
@@ -93,12 +131,14 @@ Microsoft 的 **SkillOpt** 是「**訓練文件、而非訓練模型**」的 age
 - **驗收**：在 held-out 情境上，自我演化後的 flow 守步率/正確 end state 率優於初版，且所有被接受的編輯都通過 schema 驗證與品質閘。
 - **前置**：M1（executor + eval）與 M2（I/O 契約）就緒。
 
-## 風險與緩解
-- **eval 沒有 API key 不可信** → 用腳本化假 agent 對照，至少證明「executor 擋得住違規」這個確定性保證。
-- **兩套實作再度走鐘** → M0 的 parity 測試是前提，不可跳過。
-- **核准閘語意 SOP 未表達** → M1 先用慣例推斷，M2 在 schema 正式加 `requires_approval`。
+## 風險與緩解（第二階段）
+- **「只是模擬」的質疑持續** → G1 是唯一根治；在 G1 完成前對外敘事誠實標注模擬範圍。
+- **真模型 eval 成本/不穩定** → G3 維持雙模式：CI 走確定性 agent（不依賴 key），真模型 cell 另行報告。
+- **兩套實作走鐘**（持續風險）→ parity + golden 測試已入 CI，任何 compile 改動兩邊同改。
+- **核准閘語意仍靠慣例推斷** → 在 G2/G4 把 `requires_approval` 正式入 schema 與 SOP 標註。
 
-## 成功指標（本階段）
-- **守步率差異**：compiled vs baseline 的非法動作／跳步率（核心 KPI）。
-- 測試覆蓋 compile + executor 主要路徑；CI 全綠。
-- executor 能輸出可稽核的 state history。
+## 成功指標（第二階段）
+對齊 `docs/PRODUCT.md` 北極星：
+1. **真實 agent 守步率**：G1+G3 產出真模型的非法攔截/正確終點數據。
+2. **Time-to-governed-execution**：一份新 SOP 從匯入到可受控執行的時間。
+3. **演化閉環次數**：缺口 → 提案 → 人核准 → 新版 SOP 的完整循環跑通至少一次（G2）。
