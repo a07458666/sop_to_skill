@@ -34,6 +34,12 @@ Output Skill bundle per SOP:
   Candidates come from `detect_gaps` (a validation rollout needing an undefined outcome);
   the gate uniquely selects the right target because downstream outcomes must also match.
   CLI: `--flow`, `--scenarios`, `--out`, `--budget`, `--drop` (demo aid to create a gap).
+- `evolve.py` — **evolution closing-the-loop** (G2). Takes the optimizer's accepted graph
+  edits and renders them back as a **SOP-markdown diff** (a reviewable `unified_diff` patch to
+  the source `.md`), so the human-owned SOP stays the single source of truth and recompiles
+  after approval. `apply_edit_to_markdown` maps a state id → its step section via
+  `parser.make_state_id`; `evolve_sop()` runs compile→optimize→render. CLI: `--sop`,
+  `--scenarios`, `--flow-key`, `--drop-branch` (demo), `--apply`.
 - `mcp_server.py` — **executor as an MCP server** (G1). Wraps `SkillExecutor` and speaks
   MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
   `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,

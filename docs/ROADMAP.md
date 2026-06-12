@@ -43,12 +43,13 @@
   `handle()` 為純函式並有單元測試；端到端 stdio 子行程 smoke test 通過（initialize→start→report）。
 - 規模：中。**Done.**
 
-### G2 — 演化閉環：提案以「SOP diff」回到人類
+### G2 — 演化閉環：提案以「SOP diff」回到人類（✅ 完成）
 optimizer 的圖編輯反向渲染成 SOP markdown 修訂建議，人核准後重編譯——SOP 永遠是單一事實來源。
-- 範圍：flow 編輯 → markdown 段落 patch（`**If ...**:` 分支增補等）；提案/核准/拒絕的記錄格式。
-- 驗收：`--drop` 製造的缺口 → optimizer 提案 → 以 SOP diff 呈現 → 接受後重編譯且 golden 測試更新，
-  全程留有紀錄。
-- 規模：中。
+- 已完成：`evolve.py`。accepted graph edit → `apply_edit_to_markdown`（用 `make_state_id` 對應到
+  正確的 step section，補 `**If ...**: (State: \`target\`)` 分支，保留縮排/bullet 風格）→ `unified_diff`
+  供人核准 → `--apply` 後重編譯。閉環測試：drop 一條分支 → optimizer 提案 → SOP diff → 套用 →
+  重編譯後 transition 復原且指向正確 target。
+- 規模：中。**Done.**
 
 ### G3 — 真實 LLM agent 守步率 eval
 把「28%→0%」從模擬升級為真模型對照（有/無 enforcement），讓核心主張可被外部驗證。
@@ -112,10 +113,10 @@ SOP registry（版本、狀態機 diff）、核准流（誰能放行哪些閘）
 ## 依賴與順序
 ```
 第一階段（✅ 完成）: M0 ──▶ M1 ──▶ M2 ──▶ M2.5
-第二階段（規劃）  : G1 (MCP executor server) ──▶ G3 (真實 agent eval)
-                    G2 (SOP diff 閉環)　G4 (治理層, 最後)
+第二階段        : G1 ✅ ──▶ G2 ✅ ──▶ G3 (真實 agent eval, 需 API key) ──▶ G4 (治理層, 最後)
 ```
-第一階段已全數完成並 merge / 在 PR 中。第二階段由 G1 開跑。
+G1（MCP server）、G2（SOP diff 閉環）已完成。G3 需要可呼叫真實模型的環境（本機無 API key/網路），
+待具備模型存取的環境再做；G4（治理層）最後。
 
 ## 相關工作對位：SkillOpt（arXiv 2605.23904）
 

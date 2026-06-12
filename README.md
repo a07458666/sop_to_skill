@@ -174,6 +174,24 @@ because the rest of the scenario's outcome chain must also resolve — a wrong t
 fails downstream and scores lower. Every accepted edit is a schema-valid, auditable
 graph operation.
 
+## Evolution loop: graph edits as a SOP diff
+
+`evolve.py` closes the loop. The optimizer proposes edits on the *compiled* graph, but the
+human owns the SOP markdown — so `evolve.py` renders accepted edits back as a **reviewable
+diff to the source `.md`**. After a process owner approves, the SOP recompiles, so every
+graph change traces to a version-controlled document edit.
+
+```bash
+python evolve.py --sop sample_sop.md \
+  --flow-key skills/tool_fault_investigation/flow.json \
+  --drop-branch "exposed lots are found"   # demo: drop a branch, watch it proposed back
+```
+
+```diff
+     *   **If no exposed lots are found**: Proceed to **Step 5 (Run Equipment Diagnostics)**.
++    *   **If exposed lots are found**: Transition to (State: `review_process_data`).
+```
+
 ## Tests
 
 ```bash

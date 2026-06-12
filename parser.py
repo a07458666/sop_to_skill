@@ -286,6 +286,16 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
     return report
 
 
+def make_state_id(title: str) -> str:
+    """Derive a snake_case state id from a step/state heading (e.g. 'Step 3: Check Lot
+    Exposure' -> 'check_lot_exposure'). Shared by the parser and the evolution loop."""
+    title = re.sub(r"step\s+\d+:\s*", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"^state:\s*", "", title, flags=re.IGNORECASE)
+    title = title.replace("`", "")
+    title = re.sub(r"[^a-zA-Z0-9\s]", "", title)
+    return title.lower().strip().replace(" ", "_") or "unnamed_state"
+
+
 def offline_fallback_parse(content: str) -> dict:
     """
     A heuristic markdown parser that converts a structured SOP into a state machine.
@@ -299,13 +309,6 @@ def offline_fallback_parse(content: str) -> dict:
     name_match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
     if name_match:
         sop_name = name_match.group(1).strip()
-
-    def make_state_id(title: str) -> str:
-        title = re.sub(r"step\s+\d+:\s*", "", title, flags=re.IGNORECASE)
-        title = re.sub(r"^state:\s*", "", title, flags=re.IGNORECASE)
-        title = title.replace("`", "")
-        title = re.sub(r"[^a-zA-Z0-9\s]", "", title)
-        return title.lower().strip().replace(" ", "_") or "unnamed_state"
 
     # First pass: map Step numbers and titles to state IDs.
     sections = re.split(r"###\s+", content)
