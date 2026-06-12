@@ -1730,6 +1730,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 let toolKind = null;
                 let mcpServer = null;
                 let parameters = null;
+                let returns = null;
+                let signalField = null;
                 const nextStates = {};
 
                 lines.slice(1).forEach(line => {
@@ -1744,6 +1746,14 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         const meta = detectToolMeta(tool, trimmed);
                         toolKind = meta.kind;
                         mcpServer = meta.server;
+                    }
+                    if (/[-*]\s+\*\*Returns\*\*:/i.test(trimmed)) {
+                        const codes = [...trimmed.matchAll(/`([^`]+)`/g)].map(match => match[1]);
+                        returns = codes.length ? codes : null;
+                    }
+                    if (/[-*]\s+\*\*Signal\*\*:/i.test(trimmed)) {
+                        const signalMatch = trimmed.match(/`([^`]+)`/);
+                        signalField = signalMatch ? signalMatch[1] : null;
                     }
                     const branch = trimmed.match(/\*\*If\s+([^:]+)\*\*:\s*(.+)$/i) || trimmed.match(/If\s+([^:]+):\s*(.+)$/i);
                     if (branch) {
@@ -1760,6 +1770,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     tool_kind: toolKind,
                     mcp_server: mcpServer,
                     parameters,
+                    returns,
+                    signal_field: signalField,
                     next_states: Object.keys(nextStates).length ? nextStates : null
                 });
             });
@@ -1778,6 +1790,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     tool_kind: meta.kind,
                     mcp_server: meta.server,
                     parameters: null,
+                    returns: null,
+                    signal_field: null,
                     next_states: null
                 });
             });
@@ -1890,6 +1904,17 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     if (state.tool_kind) {
                         const serverNote = state.tool_kind === 'mcp' && state.mcp_server ? ` (server: \`${state.mcp_server}\`)` : '';
                         md += `- **Integration**: \`${state.tool_kind.toUpperCase()}\`${serverNote}\n`;
+                    }
+                    if (state.returns && state.returns.length) {
+                        md += `- **Returns**: ${state.returns.map(r => `\`${r}\``).join(', ')}\n`;
+                    }
+                    if (state.next_states && Object.keys(state.next_states).length) {
+                        const check = state.tool_kind === 'mcp'
+                            ? 'the `isError` flag (true ⇒ failure branch)'
+                            : 'HTTP `status` (non-2xx ⇒ failure branch)';
+                        const channel = state.tool_kind === 'mcp' ? '`structuredContent`' : '`body.data`';
+                        const signal = state.signal_field ? `, inspect \`${state.signal_field}\`` : '';
+                        md += `- **Response Interpretation**: verify ${check}, read ${channel}${signal}, then match the outcome against a branch below.\n`;
                     }
                 }
                 if (state.next_states && Object.keys(state.next_states).length) {
@@ -2039,7 +2064,15 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         suggestions.push(`使用 \`mcp__<server>__<tool>\` 命名或加上 \`(MCP: server)\` 標註。`);
                     }
                 }
-                integrationRows.push({ id: state.id, tool: state.tool, kind, server: state.mcp_server || '', params: (state.parameters || []).length, outcomes: outcomes.length, ok: issues.length === 0, issues });
+                // Output contract (non-blocking): does the agent know what comes back and what to read?
+                if (state.type !== 'end_state' && !(state.returns && state.returns.length)) {
+                    suggestions.push(`為 \`${state.id}\` 補上 **Returns** 宣告（工具回傳欄位），讓 Agent 知道可判讀哪些值。`);
+                }
+                if (state.returns && state.returns.length && state.signal_field && !state.returns.includes(state.signal_field)) {
+                    findings.push(`工具 state \`${state.id}\` 的 **Signal** \`${state.signal_field}\` 不在宣告的 **Returns** 欄位中。`);
+                    suggestions.push(`將 \`${state.id}\` 的 Signal 改為 Returns 內的欄位，或補進 Returns。`);
+                }
+                integrationRows.push({ id: state.id, tool: state.tool, kind, server: state.mcp_server || '', params: (state.parameters || []).length, returns: (state.returns || []).length, signal: state.signal_field || '', outcomes: outcomes.length, ok: issues.length === 0, issues });
             });
 
             const uniqueSuggestions = [...new Set(suggestions)];
@@ -2054,21 +2087,21 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             report += uniqueSuggestions.length ? uniqueSuggestions.map(item => `- ${item}`).join('\n') : '- 轉換前不需要修改。';
             report += `\n\n## API / MCP 整合驗證\n\n`;
             if (integrationRows.length) {
-                report += `| State | 整合 | Server | Params | 回傳分支 | 驗證 |\n`;
-                report += `| --- | --- | --- | --- | --- | --- |\n`;
+                report += `| State | 整合 | Server | Params | Returns | Signal | 回傳分支 | 驗證 |\n`;
+                report += `| --- | --- | --- | --- | --- | --- | --- | --- |\n`;
                 integrationRows.forEach(row => {
-                    report += `| \`${row.id}\` | ${row.kind} | ${row.server ? '`' + row.server + '`' : '-'} | ${row.params} | ${row.outcomes} | ${row.ok ? '✅ 通過' : '⚠️ ' + row.issues.join('、')} |\n`;
+                    report += `| \`${row.id}\` | ${row.kind} | ${row.server ? '`' + row.server + '`' : '-'} | ${row.params} | ${row.returns} | ${row.signal ? '`' + row.signal + '`' : '-'} | ${row.outcomes} | ${row.ok ? '✅ 通過' : '⚠️ ' + row.issues.join('、')} |\n`;
                 });
                 report += mcpServersNeeded.size
                     ? `\n執行前需掛載的 MCP server：${[...mcpServersNeeded].map(server => '`' + server + '`').join('、')}。\n`
                     : `\n此 SOP 未使用 MCP 工具（皆為 API 呼叫）。\n`;
-                report += `\n每個工具 state 的回傳分支即為 Agent 的「回傳判讀規則」：API 依 HTTP \`status\` 與 \`body.result\`、MCP 依 \`isError\` 與 \`structuredContent.outcome\` 比對分支後決定下一步。\n`;
+                report += `\n每個工具 state 的「回傳判讀規則」由 **Returns**（回傳欄位）、**Signal**（主要判讀欄位）與回傳分支共同構成：API 先驗 HTTP \`status\`、讀 \`body.data\`，MCP 先驗 \`isError\`、讀 \`structuredContent\`，再依 Signal 欄位值比對分支後決定下一步。\n`;
             } else {
                 report += `- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n`;
             }
 
             report += `\n## 規則摘要\n\n`;
-            report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳判讀規則、MCP server 掛載需求）。`;
+            report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳欄位 Returns、判讀欄位 Signal、回傳判讀規則、MCP server 掛載需求）。`;
             return report;
         }
 

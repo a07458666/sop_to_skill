@@ -10,6 +10,8 @@ This SOP defines the workflow for automatically containing a semiconductor tool 
 ### Step 1: Detect Anomaly Event
 *   **Description**: Review the tool alarm, MES event, and timestamp to confirm a real anomaly occurred rather than a duplicate or false alarm.
 *   **System/Tool**: `mes_event_lookup` (API) (Parameters: `tool_id`, `event_time`)
+*   **Returns**: `event_id`, `alarm_code`, `event_count`, `is_duplicate`, `severity`
+*   **Signal**: `is_duplicate`
 *   **Branching Logic**:
     *   **If anomaly is confirmed**: Proceed to **Step 2 (Place Tool On Hold)**.
     *   **If event is a false alarm**: Transition to **Document No Fault Found** (State: `document_no_fault_found`).
@@ -17,6 +19,8 @@ This SOP defines the workflow for automatically containing a semiconductor tool 
 ### Step 2: Place Tool On Hold
 *   **Description**: Stop new wafer starts and place the affected tool under engineering hold through the equipment automation API.
 *   **System/Tool**: `eap_tool_hold` (API) (Parameters: `tool_id`, `hold_reason`)
+*   **Returns**: `hold_id`, `applied`, `eqp_state`
+*   **Signal**: `applied`
 *   **Branching Logic**:
     *   **If hold is applied successfully**: Proceed to **Step 3 (Create Tracking Ticket)**.
     *   **If hold cannot be applied**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).
@@ -24,6 +28,8 @@ This SOP defines the workflow for automatically containing a semiconductor tool 
 ### Step 3: Create Tracking Ticket
 *   **Description**: Open a tracking ticket for the anomaly so the investigation has an auditable record and an owner.
 *   **System/Tool**: `mcp__jira__create_issue` (MCP) (Parameters: `project_key`, `summary`, `severity`)
+*   **Returns**: `issue_key`, `url`, `created`, `status`
+*   **Signal**: `created`
 *   **Branching Logic**:
     *   **If ticket is created**: Proceed to **Step 4 (Notify On-Call Owner)**.
     *   **If ticket creation fails**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).
@@ -31,6 +37,8 @@ This SOP defines the workflow for automatically containing a semiconductor tool 
 ### Step 4: Notify On-Call Owner
 *   **Description**: Post the anomaly summary and ticket link to the equipment on-call channel so the responsible engineer is paged.
 *   **System/Tool**: `mcp__slack__post_message` (MCP) (Parameters: `channel`, `message`)
+*   **Returns**: `ts`, `delivered`, `channel_id`
+*   **Signal**: `delivered`
 *   **Branching Logic**:
     *   **If notification is delivered**: Proceed to **Step 5 (Confirm Owner Acknowledgement)**.
     *   **If notification fails**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).
@@ -38,6 +46,8 @@ This SOP defines the workflow for automatically containing a semiconductor tool 
 ### Step 5: Confirm Owner Acknowledgement
 *   **Description**: Poll the on-call acknowledgement status to confirm the engineer has accepted ownership of the ticket within the response window.
 *   **System/Tool**: `oncall_ack_status` (API) (Parameters: `ticket_id`, `timeout_minutes`)
+*   **Returns**: `ack_state`, `ack_latency_min`, `owner`
+*   **Signal**: `ack_state`
 *   **Branching Logic**:
     *   **If owner acknowledges in time**: Transition to **Hand Off To Owner** (State: `hand_off_to_owner`).
     *   **If acknowledgement times out**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).

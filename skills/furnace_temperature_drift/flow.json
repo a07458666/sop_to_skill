@@ -13,6 +13,8 @@
         "tool_id",
         "event_time"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "drift is confirmed": "place_furnace_on_hold",
         "drift is not confirmed": "document_no_fault_found"
@@ -29,6 +31,8 @@
         "tool_id",
         "hold_reason"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "hold is applied successfully": "identify_exposed_lots",
         "hold cannot be applied": "escalate_to_equipment_engineering"
@@ -46,6 +50,8 @@
         "event_time",
         "lookback_hours"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "exposed lots are found": "review_metrology_impact",
         "no exposed lots are found": "run_furnace_diagnostics"
@@ -62,6 +68,8 @@
         "lot_ids",
         "measurement_type"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "metrology excursion is detected": "open_mrb_case",
         "no metrology excursion is detected": "run_furnace_diagnostics"
@@ -78,6 +86,8 @@
         "tool_id",
         "zone_id"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "root cause is identified": "create_corrective_action",
         "root cause is not identified": "escalate_to_equipment_engineering"
@@ -95,6 +105,8 @@
         "root_cause",
         "action_owner"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "corrective action is approved": "verify_furnace_recovery",
         "corrective action is rejected": "escalate_to_equipment_engineering"
@@ -111,6 +123,8 @@
         "tool_id",
         "qualification_plan"
       ],
+      "returns": null,
+      "signal_field": null,
       "next_states": {
         "verification passes": "release_furnace_to_production",
         "verification fails": "escalate_to_equipment_engineering"
@@ -124,6 +138,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -134,6 +150,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -144,6 +162,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     },
     {
@@ -154,6 +174,8 @@
       "tool_kind": null,
       "mcp_server": null,
       "parameters": null,
+      "returns": null,
+      "signal_field": null,
       "next_states": null
     }
   ]

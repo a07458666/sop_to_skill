@@ -53,20 +53,39 @@ The detected `tool_kind` and `mcp_server` are written into `flow.json`, grouped 
 `## Tools Required` in `SKILL.md`, and surfaced in the web visualizer and execution simulator.
 See `sop_rule.md` for the full authoring rules.
 
+### Output contract: Returns & Signal
+
+A tool step can also declare what the tool **returns** and which field drives the
+decision, so the response-interpretation rule lives in the compiled artifact (not just
+the demo):
+
+- **Returns** — the output fields: `**Returns**: \`exposed_lot_count\`, \`lot_ids\`, \`wafer_count\``
+- **Signal** — the primary field the agent inspects to pick a branch (should be one of
+  Returns): `**Signal**: \`exposed_lot_count\``
+
+These are written into `flow.json` (`returns`, `signal_field`) and rendered in `SKILL.md`
+as a **Response Interpretation** line per tool state, e.g.:
+
+> **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read
+> `body.data`, inspect `exposed_lot_count`, then match the outcome against a branch below.
+
+Both fields are optional; when missing, the quality report adds a (non-blocking) suggestion.
+
 ### Integration validation & response interpretation
 
-`sop_quality_report.md` now includes an **`## API / MCP 整合驗證`** table that validates,
-per tool state: the parameter contract (does the agent know what to send?), the number of
-distinguishable response branches (can the agent route on the result?), and — for MCP tools —
-that an `mcp_server` could be resolved (so it can be mounted). It also lists the MCP servers
-that must be mounted before execution.
+`sop_quality_report.md` includes an **`## API / MCP 整合驗證`** table that validates,
+per tool state: the parameter contract (does the agent know what to send?), the declared
+**Returns**/**Signal** output contract (does it know what comes back and what to read?),
+the number of distinguishable response branches (can the agent route on the result?), and —
+for MCP tools — that an `mcp_server` could be resolved (so it can be mounted). It also lists
+the MCP servers that must be mounted before execution.
 
 Each tool state's branch conditions act as the agent's **response-interpretation rules**:
 
-- **API**: verify the HTTP `status` (non-2xx ⇒ failure branch), then read `body.result`
-  and match it against the state's branch conditions.
-- **MCP**: check the `isError` flag, then read `structuredContent.outcome` and match it
-  against the branch conditions.
+- **API**: verify the HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect the
+  `signal_field`, and match it against the state's branch conditions.
+- **MCP**: check the `isError` flag, read `structuredContent`, inspect the `signal_field`, and
+  match it against the branch conditions.
 
 The web demo (`index.html`) makes this interactive: a **MCP Server 掛載** panel lets you
 mount/unmount the servers referenced by the SOP (MCP tool calls are blocked until mounted),
@@ -110,6 +129,68 @@ python eval/run_eval.py --check    # also fails CI unless compiled beats baselin
 
 Representative result (10 scenarios, 4 SOPs): illegal-action rate **28% → 0%**,
 correct-end rate **60% → 100%**, all illegal attempts blocked by the executor.
+
+## MCP server: a real agent under enforcement
+
+`mcp_server.py` exposes the executor as a Model Context Protocol server so a real agent
+(e.g. Claude) can drive a SOP under enforcement — not just the simulated agents in `eval/`.
+It speaks MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency.
+
+```bash
+python mcp_server.py --flow skills/tool_fault_investigation/flow.json
+```
+
+Tools exposed to the agent:
+
+| Tool | Purpose |
+| --- | --- |
+| `sop_start` | begin a session from a `flow.json` |
+| `sop_current_state` | current description, tool, parameters/returns/signal, legal outcomes |
+| `sop_report_outcome` | advance via an outcome; **unknown outcomes are rejected** with the legal list |
+| `sop_request_approval` | pass a human-in-the-loop approval gate |
+| `sop_call_tool` | gate-check a tool call (only the state's declared tool is allowed) |
+| `sop_audit_trail` | the serializable compliance trail |
+
+The same enforcement guarantees from the eval (no illegal transitions, approval gates,
+audit trail) now apply to a live agent over the wire.
+
+## Structured self-evolution (optimizer)
+
+`optimizer.py` evolves a `flow.json` the way SkillOpt evolves a `SKILL.md` — but with
+**bounded, typed graph edits** instead of free text. It detects adherence gaps (a
+validation rollout that needs an outcome the graph doesn't define), proposes candidate
+edits, and accepts one **only when it strictly improves a held-out validation score**
+(scored by running an oracle agent through the executor). Wrong candidates go into a
+rejected-edit buffer; an edit budget bounds the change. No LLM/API required.
+
+```bash
+# demo: drop a real branch, then watch the optimizer re-discover and re-add it
+python optimizer.py --flow skills/tool_fault_investigation/flow.json \
+  --drop "check_lot_exposure=exposed lots are found"
+```
+
+The validation gate uniquely selects the correct target (e.g. `review_process_data`)
+because the rest of the scenario's outcome chain must also resolve — a wrong target
+fails downstream and scores lower. Every accepted edit is a schema-valid, auditable
+graph operation.
+
+## Evolution loop: graph edits as a SOP diff
+
+`evolve.py` closes the loop. The optimizer proposes edits on the *compiled* graph, but the
+human owns the SOP markdown — so `evolve.py` renders accepted edits back as a **reviewable
+diff to the source `.md`**. After a process owner approves, the SOP recompiles, so every
+graph change traces to a version-controlled document edit.
+
+```bash
+python evolve.py --sop sample_sop.md \
+  --flow-key skills/tool_fault_investigation/flow.json \
+  --drop-branch "exposed lots are found"   # demo: drop a branch, watch it proposed back
+```
+
+```diff
+     *   **If no exposed lots are found**: Proceed to **Step 5 (Run Equipment Diagnostics)**.
++    *   **If exposed lots are found**: Transition to (State: `review_process_data`).
+```
 
 ## Tests
 

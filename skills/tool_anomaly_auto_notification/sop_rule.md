@@ -37,6 +37,17 @@
 - 參數名稱應穩定且具語意，例如 `tool_id`、`lot_ids`、`event_time`、`recipe_id`。
 - 如果某步驟只是純判斷，沒有呼叫系統或工具，可以省略 `System/Tool`。
 
+## 回傳契約規則（Returns / Signal）
+
+- **Returns**：宣告工具回傳的輸出欄位，讓 Agent 知道回傳值有哪些可供判讀。
+  - 格式：另起一行 `**Returns**: \`field1\`, \`field2\`, ...`（欄位名以 backtick 標示）。
+  - 範例：`**Returns**: \`exposed_lot_count\`, \`lot_ids\`, \`wafer_count\``
+- **Signal**：宣告 Agent 用來決定分支的「主要判讀欄位」，應為 Returns 之一。
+  - 格式：`**Signal**: \`field\``
+  - 範例：`**Signal**: \`exposed_lot_count\``
+- 判讀規則：API 先驗 HTTP `status`、讀 `body.data`；MCP 先驗 `isError`、讀 `structuredContent`；再依 **Signal** 欄位值比對 `**If ...**:` 分支後決定下一步。
+- Returns / Signal 為選填但建議補上；缺少時品質報告會以「修改建議」提示（不擋轉換）。
+
 ## API 與 MCP 整合標註
 
 - 每個工具呼叫應標明整合方式：API 或 MCP。

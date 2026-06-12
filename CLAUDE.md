@@ -27,6 +27,25 @@ Output Skill bundle per SOP:
   legal-only tool calls + outcomes, human-in-the-loop **approval gates** (inferred via
   `DEFAULT_APPROVAL_KEYWORDS`, e.g. hold/escalate/release), and a serializable audit trail.
   CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`.
+- `optimizer.py` — **structured self-evolution** of a flow (M2.5), the structured analogue
+  of SkillOpt. Proposes **bounded graph edits** (`Edit`: add_transition / set_signal_field),
+  accepts one **only when it strictly improves a held-out validation score** (`score_flow`
+  via an oracle agent through the executor), with a rejected-edit buffer and edit budget.
+  Candidates come from `detect_gaps` (a validation rollout needing an undefined outcome);
+  the gate uniquely selects the right target because downstream outcomes must also match.
+  CLI: `--flow`, `--scenarios`, `--out`, `--budget`, `--drop` (demo aid to create a gap).
+- `evolve.py` — **evolution closing-the-loop** (G2). Takes the optimizer's accepted graph
+  edits and renders them back as a **SOP-markdown diff** (a reviewable `unified_diff` patch to
+  the source `.md`), so the human-owned SOP stays the single source of truth and recompiles
+  after approval. `apply_edit_to_markdown` maps a state id → its step section via
+  `parser.make_state_id`; `evolve_sop()` runs compile→optimize→render. CLI: `--sop`,
+  `--scenarios`, `--flow-key`, `--drop-branch` (demo), `--apply`.
+- `mcp_server.py` — **executor as an MCP server** (G1). Wraps `SkillExecutor` and speaks
+  MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
+  `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,
+  `sop_report_outcome` (rejects undefined outcomes, returns legal ones), `sop_request_approval`,
+  `sop_call_tool` (gate-checks tool calls), `sop_audit_trail`. `handle()` is pure/unit-tested;
+  `serve_stdio()` is the I/O loop a real agent client spawns. Run: `python mcp_server.py --flow ...`.
 - `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
   `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
   compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /
@@ -40,6 +59,9 @@ Output Skill bundle per SOP:
   the compiler in JS (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`)
   to stay at **parity with `parser.py`**, plus the flow visualizer, MCP mount panel,
   and execution simulator. No build step; all inline.
+- `docs/PRODUCT.md` — product positioning (four-pillar loop: Compile/Enforce/Prove/Evolve,
+  SOP-as-Code, north-star metrics). `docs/ROADMAP.md` — schedule + acceptance criteria;
+  phase 1 (M0–M2.5) done, phase 2 is G1–G4 (G1 = executor as a real MCP server, first).
 - `sample_sop.md` — semiconductor tool fault investigation (English; default for CLI).
 - `examples/` — more SOPs incl. `tool_anomaly_auto_notification_sop.md` (mixed API+MCP).
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
@@ -54,8 +76,9 @@ Output Skill bundle per SOP:
 
 A SOP compiles to a state machine. Each `State` has: `id`, `type`
 (`action` | `decision` | `end_state`), `description`, `tool`, `tool_kind`
-(`api` | `mcp` | null), `mcp_server`, `parameters`, `next_states`
-(map of free-text outcome → target state id).
+(`api` | `mcp` | null), `mcp_server`, `parameters` (input fields), `returns`
+(output fields), `signal_field` (the primary output field the agent reads to route),
+`next_states` (map of free-text outcome → target state id).
 
 ### API vs MCP tools (SOP annotation)
 In a `**System/Tool**` line, declare the integration:
@@ -66,10 +89,18 @@ In a `**System/Tool**` line, declare the integration:
   segment between `mcp__` and the next `__`, or the `(MCP: server)` value.
 - Implemented identically in `parser.py:detect_tool_meta` and `index.html:detectToolMeta`.
 
+### Output contract: Returns / Signal (M2)
+A tool step may declare its output contract in the SOP markdown:
+- `**Returns**: \`f1\`, \`f2\`` → `returns` (output field names).
+- `**Signal**: \`f1\`` → `signal_field` (the field the agent inspects to route; should be in `returns`).
+Parsed identically in `parser.py` and `index.html:compileMarkdownToFlow`, written into
+`flow.json`, rendered as a **Response Interpretation** line in `SKILL.md`, and validated
+(non-blocking) in the quality report's integration table (Returns/Signal columns).
+
 ### Response interpretation (how the agent routes)
 Each state's `next_states` keys are the agent's **response-interpretation rules**:
-- API: check HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, match a branch.
-- MCP: check `isError`, read `structuredContent`, match a branch.
+- API: check HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `signal_field`, match a branch.
+- MCP: check `isError`, read `structuredContent`, inspect `signal_field`, match a branch.
 Surfaced in the node inspector, simulator, and quality report.
 
 ## Web demo concepts (index.html)

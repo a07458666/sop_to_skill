@@ -34,7 +34,16 @@ CASES = [
     "examples/tool_anomaly_auto_notification_sop.md",
 ]
 
-STRUCT_FIELDS = ["type", "tool", "tool_kind", "mcp_server", "parameters", "next_states"]
+STRUCT_FIELDS = [
+    "type",
+    "tool",
+    "tool_kind",
+    "mcp_server",
+    "parameters",
+    "returns",
+    "signal_field",
+    "next_states",
+]
 
 
 def _read(rel_path: str) -> str:
