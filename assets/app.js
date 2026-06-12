@@ -396,6 +396,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 let parameters = null;
                 let returns = null;
                 let signalField = null;
+                let requiresApproval = null;
                 const nextStates = {};
 
                 lines.slice(1).forEach(line => {
@@ -419,6 +420,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         const signalMatch = trimmed.match(/`([^`]+)`/);
                         signalField = signalMatch ? signalMatch[1] : null;
                     }
+                    if (/[-*]\s+\*\*(?:Requires\s+)?Approval\*\*:/i.test(trimmed)) {
+                        const approvalVal = trimmed.split(/:\s*/).slice(1).join(': ').trim().toLowerCase();
+                        requiresApproval = ['required', 'yes', 'true', '需要'].includes(approvalVal);
+                    }
                     const branch = trimmed.match(/\*\*If\s+([^:]+)\*\*:\s*(.+)$/i) || trimmed.match(/If\s+([^:]+):\s*(.+)$/i);
                     if (branch) {
                         const target = resolveTarget(branch[2]);
@@ -436,6 +441,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     parameters,
                     returns,
                     signal_field: signalField,
+                    requires_approval: requiresApproval,
                     next_states: Object.keys(nextStates).length ? nextStates : null
                 });
             });
@@ -456,6 +462,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     parameters: null,
                     returns: null,
                     signal_field: null,
+                    requires_approval: null,
                     next_states: null
                 });
             });
@@ -585,6 +592,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         const signal = state.signal_field ? `, inspect \`${state.signal_field}\`` : '';
                         md += `- **Response Interpretation**: verify ${check}, read ${channel}${signal}, then match the outcome against a branch below.\n`;
                     }
+                }
+                if (state.requires_approval) {
+                    md += `- **Approval Gate**: requires human-in-the-loop approval before advancing; do not transition until a human approves.\n`;
                 }
                 if (state.next_states && Object.keys(state.next_states).length) {
                     md += `- **Branching / Next States**:\n`;
@@ -768,6 +778,12 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             } else {
                 report += `- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n`;
             }
+
+            const approvalGates = (flow.states || []).filter(s => s.requires_approval).map(s => s.id);
+            report += `\n## 核准閘 (Approval Gates)\n\n`;
+            report += approvalGates.length
+                ? `- 下列 state 已用 \`**Approval**: required\` 標註為人機協同核准閘，Agent 必須取得核准才能前進：${approvalGates.map(g => '`' + g + '`').join('、')}。\n`
+                : `- 此 SOP 未以 \`**Approval**: required\` 明確標註核准閘；executor 仍會依慣例關鍵字（如 hold / escalate / release）於執行期推斷。\n`;
 
             report += `\n## 規則摘要\n\n`;
             report += `本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳欄位 Returns、判讀欄位 Signal、回傳判讀規則、MCP server 掛載需求）。`;
@@ -1088,6 +1104,10 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         <div class="inspector-item">
                             <div class="inspector-label">下一步跳轉路由</div>
                             <div class="inspector-val">${transitions}</div>
+                        </div>
+                        <div class="inspector-item">
+                            <div class="inspector-label">核准閘 (Approval Gate)</div>
+                            <div class="inspector-val" style="color: ${state.requires_approval ? 'var(--amber)' : 'var(--text-muted)'}">${state.requires_approval ? '需要人類核准才能前進' : (state.requires_approval === false ? '明確不需核准' : '未標註（執行期依關鍵字推斷）')}</div>
                         </div>
                         ${spec ? `
                         <div class="inspector-item" style="grid-column: span 2">
@@ -1658,8 +1678,16 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const flow = parseGeneratedFlow();
             simulationState = {
                 currentStateId: flow.start_state,
-                history: flow.start_state ? [{ stateId: flow.start_state, condition: 'start' }] : []
+                history: flow.start_state ? [{ stateId: flow.start_state, condition: 'start' }] : [],
+                approved: {}
             };
+            renderSkillSimulator();
+        }
+
+        // Mirror the executor's approval gate: a state marked requires_approval cannot
+        // be left until a human approves it here.
+        function approveCurrentState() {
+            simulationState.approved[simulationState.currentStateId] = true;
             renderSkillSimulator();
         }
 
@@ -1668,6 +1696,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const contract = buildToolContract(sourceState);
             // Guard: an MCP tool cannot be called until its server is mounted.
             if (contract && contract.transport === 'MCP' && !mcpMounts[contract.server]) return;
+            // Guard: cannot advance past an unapproved approval gate.
+            if (sourceState && sourceState.requires_approval && !simulationState.approved[sourceState.id]) return;
 
             const entry = { stateId: targetStateId, condition };
             if (sourceState && sourceState.tool) {
@@ -1712,6 +1742,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const contract = buildToolContract(state);
             const request = buildMockRequest(state);
             const mcpBlocked = contract && contract.transport === 'MCP' && !mcpMounts[contract.server];
+            const approved = !!simulationState.approved[state.id];
+            const needsApproval = state.requires_approval && !approved;
 
             const kindPill = state.tool_kind
                 ? `<span class="sim-pill" style="color: ${state.tool_kind === 'mcp' ? 'var(--accent)' : 'var(--secondary)'}; border-color: ${state.tool_kind === 'mcp' ? 'rgba(217,70,239,0.4)' : 'rgba(79,172,254,0.4)'}">${escapeHtml(state.tool_kind.toUpperCase())}${state.tool_kind === 'mcp' && state.mcp_server ? ` · ${escapeHtml(state.mcp_server)}` : ''}</span>`
@@ -1737,6 +1769,12 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             let choiceSection;
             if (!choices.length) {
                 choiceSection = '<div class="sim-pill">已抵達終點狀態，流程結束。</div>';
+            } else if (needsApproval) {
+                choiceSection = `
+                    <div class="sim-warning">
+                        <div><i data-lucide="shield-alert" style="width:15px; vertical-align:-2px;"></i> 核准閘：此 state 標記為 <code>requires_approval</code>，Agent 必須先取得人類核准才能離開（對應 executor 的 <code>ApprovalRequiredError</code>）。</div>
+                        <button class="mount-btn" onclick="approveCurrentState()"><i data-lucide="check-circle" style="width:15px;"></i> 核准並繼續</button>
+                    </div>`;
             } else if (mcpBlocked) {
                 choiceSection = `
                     <div class="sim-warning">
@@ -1763,6 +1801,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     <span class="sim-pill">tool: ${escapeHtml(state.tool || 'None')}</span>
                     ${kindPill}
                     <span class="sim-pill">params: ${escapeHtml(params)}</span>
+                    ${state.requires_approval ? `<span class="sim-pill" style="color: var(--amber); border-color: rgba(245,158,11,0.4)">核准閘${approved ? ' ✓ 已核准' : ''}</span>` : ''}
                 </div>
                 <p style="color: var(--text-muted);">${escapeHtml(state.description)}</p>
                 ${requestBlock}

@@ -46,6 +46,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Integration**: `API`
 - **Returns**: `hold_id`, `applied`, `eqp_state`
 - **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `applied`, then match the outcome against a branch below.
+- **Approval Gate**: requires human-in-the-loop approval before advancing; do not transition until a human approves.
 - **Branching / Next States**:
   - If outcome is `hold is applied successfully` -> transition to `check_lot_exposure`
   - If outcome is `hold cannot be applied` -> transition to `escalate_to_equipment_engineering`
@@ -86,6 +87,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 - **Integration**: `API`
 - **Returns**: `ca_id`, `approval_state`, `owner`
 - **Response Interpretation**: verify HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `approval_state`, then match the outcome against a branch below.
+- **Approval Gate**: requires human-in-the-loop approval before advancing; do not transition until a human approves.
 - **Branching / Next States**:
   - If outcome is `corrective action is approved` -> transition to `verify_tool_recovery`
   - If outcome is `corrective action is rejected` -> transition to `escalate_to_equipment_engineering`

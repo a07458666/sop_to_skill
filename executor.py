@@ -27,9 +27,10 @@ from typing import Dict, List, Optional
 
 from parser import State, StateMachine
 
-# State ids / descriptions matching any of these substrings are treated as
-# human-in-the-loop approval gates unless the caller overrides the set. Kept as a
-# convention for M1; M2 promotes `requires_approval` into the SOP schema.
+# Fallback inference: a state whose `requires_approval` is left unset (null) is
+# treated as a human-in-the-loop approval gate when its id/description matches any
+# of these substrings. An explicit `requires_approval` (True/False) in the SOP
+# schema always wins over this convention.
 DEFAULT_APPROVAL_KEYWORDS = (
     "hold",
     "escalat",
@@ -115,8 +116,11 @@ class SkillExecutor:
         for state in self.machine.states:
             if state.type == "end_state":
                 continue
-            if getattr(state, "requires_approval", None):
+            declared = getattr(state, "requires_approval", None)
+            if declared is True:  # explicit `**Approval**: required`
                 gates.add(state.id)
+                continue
+            if declared is False:  # explicit opt-out — never a gate, skip inference
                 continue
             haystack = f"{state.id} {state.description or ''}".lower()
             if any(kw in haystack for kw in self._approval_keywords):

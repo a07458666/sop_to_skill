@@ -30,6 +30,44 @@ def test_returns_and_signal_are_parsed():
     assert by_id["document_no_fault_found"].returns is None
 
 
+def test_approval_annotation_is_parsed():
+    sm = StateMachine(**offline_fallback_parse(_read("sample_sop.md")))
+    by_id = {s.id: s for s in sm.states}
+    # explicitly annotated `**Approval**: required`
+    assert by_id["place_tool_on_hold"].requires_approval is True
+    assert by_id["create_corrective_action"].requires_approval is True
+    # un-annotated steps stay null (fall back to runtime keyword inference)
+    assert by_id["check_lot_exposure"].requires_approval is None
+
+
+def test_approval_opt_out_is_parsed():
+    md = (
+        "# SOP: x\n\n## Workflow Steps\n\n"
+        "### Step 1: Hold The Tool\n"
+        "*   **Description**: stop the tool.\n"
+        "*   **System/Tool**: `tool_hold` (API)\n"
+        "*   **Approval**: no\n"
+        "*   **Branching Logic**:\n"
+        "    *   **If done**: Proceed to **Step 2 (Finish)**.\n\n"
+        "### Step 2: Finish\n"
+        "*   **Description**: wrap up.\n\n"
+        "## End States\n\n"
+        "### State: `finish`\n"
+        "*   **Action**: close out.\n"
+    )
+    by_id = {s.id: s for s in StateMachine(**offline_fallback_parse(md)).states}
+    assert by_id["hold_the_tool"].requires_approval is False
+
+
+def test_skill_md_and_report_surface_approval_gate():
+    sm = StateMachine(**offline_fallback_parse(_read("sample_sop.md")))
+    md = generate_skill_md(sm)
+    assert "**Approval Gate**:" in md
+    report = assess_sop_quality(_read("sample_sop.md"), sm, "")
+    assert "核准閘 (Approval Gates)" in report
+    assert "`place_tool_on_hold`" in report
+
+
 def test_skill_md_renders_response_interpretation():
     sm = StateMachine(**offline_fallback_parse(_read("sample_sop.md")))
     md = generate_skill_md(sm)

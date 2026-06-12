@@ -138,7 +138,7 @@ Microsoft 的 **SkillOpt** 是「**訓練文件、而非訓練模型**」的 age
 - **「只是模擬」的質疑持續** → G1 是唯一根治；在 G1 完成前對外敘事誠實標注模擬範圍。
 - **真模型 eval 成本/不穩定** → G3 維持雙模式：CI 走確定性 agent（不依賴 key），真模型 cell 另行報告。
 - **兩套實作走鐘**（持續風險）→ parity + golden 測試已入 CI，任何 compile 改動兩邊同改。
-- **核准閘語意仍靠慣例推斷** → 在 G2/G4 把 `requires_approval` 正式入 schema 與 SOP 標註。
+- ~~**核准閘語意仍靠慣例推斷**~~ → ✅ 已把 `requires_approval` 正式入 schema 與 SOP 標註（`**Approval**: required`）；明確標註優先於關鍵字推斷，未標註才回退 `DEFAULT_APPROVAL_KEYWORDS`。
 
 ## 成功指標（第二階段）
 對齊 `docs/PRODUCT.md` 北極星：

@@ -21,6 +21,7 @@
         "severity"
       ],
       "signal_field": "is_duplicate",
+      "requires_approval": null,
       "next_states": {
         "anomaly is confirmed": "place_tool_on_hold",
         "event is a false alarm": "document_no_fault_found"
@@ -43,6 +44,7 @@
         "eqp_state"
       ],
       "signal_field": "applied",
+      "requires_approval": null,
       "next_states": {
         "hold is applied successfully": "create_tracking_ticket",
         "hold cannot be applied": "escalate_to_equipment_engineering"
@@ -67,6 +69,7 @@
         "status"
       ],
       "signal_field": "created",
+      "requires_approval": null,
       "next_states": {
         "ticket is created": "notify_oncall_owner",
         "ticket creation fails": "escalate_to_equipment_engineering"
@@ -89,6 +92,7 @@
         "channel_id"
       ],
       "signal_field": "delivered",
+      "requires_approval": null,
       "next_states": {
         "notification is delivered": "confirm_owner_acknowledgement",
         "notification fails": "escalate_to_equipment_engineering"
@@ -111,6 +115,7 @@
         "owner"
       ],
       "signal_field": "ack_state",
+      "requires_approval": null,
       "next_states": {
         "owner acknowledges in time": "hand_off_to_owner",
         "acknowledgement times out": "escalate_to_equipment_engineering"
@@ -126,6 +131,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -138,6 +144,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -150,6 +157,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     }
   ]

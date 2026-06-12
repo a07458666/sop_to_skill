@@ -21,6 +21,7 @@
         "severity"
       ],
       "signal_field": "is_duplicate",
+      "requires_approval": null,
       "next_states": {
         "fault event is confirmed": "place_tool_on_hold",
         "event is duplicate or false alarm": "document_no_fault_found"
@@ -43,6 +44,7 @@
         "eqp_state"
       ],
       "signal_field": "applied",
+      "requires_approval": true,
       "next_states": {
         "hold is applied successfully": "check_lot_exposure",
         "hold cannot be applied": "escalate_to_equipment_engineering"
@@ -67,6 +69,7 @@
         "window"
       ],
       "signal_field": "exposed_lot_count",
+      "requires_approval": null,
       "next_states": {
         "exposed lots are found": "review_process_data",
         "no exposed lots are found": "run_equipment_diagnostics"
@@ -91,6 +94,7 @@
         "metrology_oos"
       ],
       "signal_field": "excursion_detected",
+      "requires_approval": null,
       "next_states": {
         "process excursion is detected": "open_mrb_case",
         "no process excursion is detected": "run_equipment_diagnostics"
@@ -114,6 +118,7 @@
         "error_lines"
       ],
       "signal_field": "root_cause_found",
+      "requires_approval": null,
       "next_states": {
         "root cause is identified": "create_corrective_action",
         "root cause is not identified": "escalate_to_equipment_engineering"
@@ -137,6 +142,7 @@
         "owner"
       ],
       "signal_field": "approval_state",
+      "requires_approval": true,
       "next_states": {
         "corrective action is approved": "verify_tool_recovery",
         "corrective action is rejected": "escalate_to_equipment_engineering"
@@ -159,6 +165,7 @@
         "monitor_cpk"
       ],
       "signal_field": "qual_result",
+      "requires_approval": null,
       "next_states": {
         "verification passes": "release_tool_to_production",
         "verification fails": "escalate_to_equipment_engineering"
@@ -174,6 +181,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -186,6 +194,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -198,6 +207,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -210,6 +220,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     }
   ]
