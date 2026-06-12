@@ -1991,14 +1991,32 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         function loadFlowFromText(text) {
             const flow = JSON.parse(text); // throws on invalid JSON
             generatedFiles['flow-json'] = JSON.stringify(flow, null, 2);
+            // A pasted flow.json carries no source SOP, so SKILL.md is regenerated from
+            // the graph and the quality report (which needs the markdown) is cleared.
+            generatedFiles['skill-md'] = buildSkillMarkdown(flow);
+            generatedFiles['quality-report-md'] = '';
             seedIntegrationFromFlow(flow);
             syncMcpMounts();
             renderIntegrationEditor();
             renderMcpPanel();
             renderFlowFromGeneratedJson();
+            renderCompiledArtifacts();
             resetSimulation();
             persistState();
             return flow;
+        }
+        // Show the (context-only) compiled artifacts on the Simulator page; the simulator
+        // itself only executes flow.json.
+        function renderCompiledArtifacts() {
+            const skillEl = document.getElementById('sim-skill-md');
+            const qrEl = document.getElementById('sim-quality-report');
+            if (!skillEl || !qrEl) return;
+            const flow = parseGeneratedFlow();
+            let skill = generatedFiles['skill-md'];
+            if (!skill && flow.states && flow.states.length) skill = buildSkillMarkdown(flow);
+            skillEl.textContent = skill || '（尚無 SKILL.md，請先從 Converter 編譯或貼上 flow.json）';
+            qrEl.textContent = generatedFiles['quality-report-md']
+                || '（貼上 flow.json 模式下沒有品質報告；請從 Converter 編譯以取得完整報告）';
         }
         function loadPastedFlow() {
             const box = document.getElementById('flow-paste');
@@ -2039,6 +2057,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             renderIntegrationEditor();
             renderMcpPanel();
             renderFlowFromGeneratedJson();
+            renderCompiledArtifacts();
             resetSimulation();
         }
         (function initPage() {
