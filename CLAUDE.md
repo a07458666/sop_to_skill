@@ -111,9 +111,17 @@ Surfaced in the node inspector, simulator, and quality report.
   `getToolSpec` falls back to a generic schema for unlisted tools.
   `mockQueryResult(state, outcome)` returns `{ok, data, interpretation}`;
   `isFailureOutcome(condition)` decides success vs failure data (EN + 中文 keywords).
-- **MCP mount panel** (`renderMcpPanel`): mount/unmount servers referenced by the SOP;
-  advertises each server's tool schemas. MCP tool calls in the simulator are **blocked
-  until the server is mounted** (`mcpMounts` state).
+- **Integration config editor** (`integrationConfig` + `renderIntegrationEditor`): a
+  user-editable registry of MCP servers/tools and API tools with per-tool I/O fields
+  (`input`/`output` as `name:type`) and a `signal`. **Seeded from `flow.json` on compile**
+  (`seedIntegrationFromFlow`: params→inputs, `returns`→outputs, `signal_field`→signal;
+  rich types pulled from `toolCatalog` when the tool is known). `getToolSpec` consults this
+  config first (`findIntegrationSpec` → `specFromEntry` synthesizes `rows`/`interpret`), so
+  the mount panel, node inspector and simulator all reflect the user's edits after
+  「套用設定」. This is how the user sees/edits exactly how the skill calls API/MCP.
+- **MCP mount panel** (`renderMcpPanel`): mount/unmount the configured servers;
+  advertises each server's tool schemas (from `integrationConfig`). MCP tool calls in the
+  simulator are **blocked until the server is mounted** (`mcpMounts` state).
 - **Execution simulator**: shows request payload, output schema, the verification rule,
   and per-branch mock responses; the "Investigation Log" records returned data + the
   agent's interpretation per step.

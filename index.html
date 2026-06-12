@@ -1037,6 +1037,44 @@
             border-top: 1px solid var(--border-color);
             padding-top: 30px;
         }
+
+        /* Integration configuration editor */
+        .intg-toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .intg-btn {
+            background: var(--primary); color: #fff; border: none; border-radius: 8px;
+            padding: 8px 14px; font-size: 0.85rem; cursor: pointer; display: inline-flex;
+            align-items: center; gap: 6px; transition: opacity 0.15s;
+        }
+        .intg-btn:hover { opacity: 0.88; }
+        .intg-btn.secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border-color); }
+        .intg-btn.tiny { padding: 3px 9px; font-size: 0.78rem; }
+        .intg-btn.danger { background: rgba(239,68,68,0.16); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); }
+        .intg-group { margin-bottom: 18px; }
+        .intg-group-title { font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 7px; color: var(--text); }
+        .intg-server {
+            border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;
+            margin-bottom: 12px; background: rgba(255,255,255,0.02);
+        }
+        .intg-server-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .intg-tool {
+            display: grid; grid-template-columns: 1.1fr 1.6fr 1.6fr 1fr auto; gap: 8px;
+            align-items: center; margin-bottom: 7px;
+        }
+        .intg-api-row {
+            display: grid; grid-template-columns: 1.1fr 1.6fr 1.6fr 1fr auto; gap: 8px;
+            align-items: center; margin-bottom: 7px;
+        }
+        .intg-head-row { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+        .intg-input {
+            background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 6px 8px; color: var(--text); font-size: 0.82rem; font-family: 'SF Mono', Menlo, monospace; width: 100%;
+        }
+        .intg-input:focus { outline: none; border-color: var(--primary); }
+        .intg-hint { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 14px; }
+        @media (max-width: 760px) {
+            .intg-tool, .intg-api-row { grid-template-columns: 1fr 1fr; }
+            .intg-head-row { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -1249,6 +1287,19 @@
                 </div>
             </div>
 
+        </section>
+
+        <!-- API / MCP Integration Configuration -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="settings-2"></i> API / MCP 整合設定 (Integration Configuration)</h2>
+            <p class="intg-hint">編譯後會依 <code>flow.json</code> 的工具、參數、<code>Returns</code>、<code>Signal</code> 自動帶入下方設定。你可以<strong>編輯要使用的 MCP server 與其工具、設定要測試的 API、以及每個工具的輸入/輸出（I/O）欄位與判讀 Signal</strong>。按「套用設定」後，下方的掛載面板、節點檢視器與執行模擬器都會依此設定顯示 skill 實際如何調用 API / MCP 並判讀回傳。</p>
+            <div class="intg-toolbar">
+                <button class="intg-btn" onclick="applyIntegration()"><i data-lucide="check-check" style="width:15px;"></i> 套用設定（讀取工具 / 輸出）</button>
+                <button class="intg-btn secondary" onclick="addMcpServer()"><i data-lucide="server" style="width:15px;"></i> 新增 MCP server</button>
+                <button class="intg-btn secondary" onclick="addApiTool()"><i data-lucide="globe" style="width:15px;"></i> 新增 API</button>
+                <button class="intg-btn secondary" onclick="reseedIntegration()"><i data-lucide="rotate-ccw" style="width:15px;"></i> 依 SOP 重設</button>
+            </div>
+            <div id="integration-editor"></div>
         </section>
 
         <!-- MCP / API Runtime Mounting & Validation -->
@@ -1839,7 +1890,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                     syncQualityReport(document.getElementById('markdown-input').value);
                     renderRuleAndReportBlocks();
                     renderFlowFromGeneratedJson();
-                    syncMcpMounts(flow);
+                    seedIntegrationFromFlow(flow);
+                    syncMcpMounts();
+                    renderIntegrationEditor();
                     renderMcpPanel();
                     resetSimulation();
                     display.textContent = generatedFiles[currentTab];
@@ -2595,8 +2648,103 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             return Object.prototype.hasOwnProperty.call(samples, name) ? samples[name] : `<${name}>`;
         }
 
+        // --- User-editable API / MCP integration configuration ---------------------
+        // Lets the user edit which MCP servers/tools and APIs the skill uses, and each
+        // tool's I/O fields, so the simulator/inspector show exactly how the skill calls
+        // API / MCP and reads the output. Seeded from flow.json on compile.
+        let integrationConfig = { mcpServers: [], apiTools: [] };
+
+        function parseIo(str) {
+            return String(str || '')
+                .split(',')
+                .map(part => part.trim())
+                .filter(Boolean)
+                .map(part => {
+                    const [name, ...rest] = part.split(':');
+                    return [name.trim(), (rest.join(':').trim() || 'value')];
+                })
+                .filter(pair => pair[0]);
+        }
+
+        function ioToStr(pairs) {
+            return (pairs || []).map(([name, type]) => `${name}:${type}`).join(', ');
+        }
+
+        function sampleByType(type, ok, name) {
+            const t = String(type || '').toLowerCase();
+            if (t.includes('bool')) return ok;
+            if (t.includes('int') || t.includes('float') || t.includes('number')) return ok ? 1 : 0;
+            if (t.includes('enum')) return ok ? 'OK' : 'ERROR';
+            if (t.includes('[]') || t.includes('array')) return ok ? [`<${name}>`] : [];
+            return ok ? `<${name}>` : '';
+        }
+
+        function specFromEntry(entry, kind, server) {
+            const inputs = parseIo(entry.inputs);
+            const outputs = parseIo(entry.outputs);
+            const signal = (entry.signal || '').trim();
+            return {
+                _user: true,
+                kind,
+                server,
+                description: (kind === 'mcp' ? `[MCP ${server || '?'}] ` : '[REST API] ')
+                    + `${entry.name} — 使用者設定的整合。`,
+                inputs,
+                outputs,
+                signal,
+                rows: ok => {
+                    const row = {};
+                    outputs.forEach(([n, t]) => { row[n] = sampleByType(t, ok, n); });
+                    if (!outputs.length) row.status = ok ? 'OK' : 'ERROR';
+                    return row;
+                },
+                interpret: ok => {
+                    if (signal) {
+                        const pair = outputs.find(o => o[0] === signal) || [signal, 'enum'];
+                        return `讀取 \`${signal}=${JSON.stringify(sampleByType(pair[1], ok, signal))}\` ⇒ 走${ok ? '成功' : '失敗'}分支`;
+                    }
+                    return `依回傳值判讀 ⇒ 走${ok ? '成功' : '失敗'}分支`;
+                }
+            };
+        }
+
+        function findIntegrationSpec(toolName) {
+            if (!toolName) return null;
+            const api = integrationConfig.apiTools.find(t => t.name === toolName);
+            if (api) return specFromEntry(api, 'api', null);
+            for (const srv of integrationConfig.mcpServers) {
+                const tool = (srv.tools || []).find(t => t.name === toolName);
+                if (tool) return specFromEntry(tool, 'mcp', srv.server);
+            }
+            return null;
+        }
+
+        function seedIntegrationFromFlow(flow) {
+            const servers = {};
+            const apis = [];
+            flow.states.forEach(state => {
+                if (!state.tool) return;
+                const cat = toolCatalog[state.tool];
+                const inputs = cat ? ioToStr(cat.inputs) : (state.parameters || []).map(p => `${p}:string`).join(', ');
+                const outputs = cat ? ioToStr(cat.outputs) : (state.returns || []).map(r => `${r}:value`).join(', ');
+                const signal = state.signal_field || '';
+                if (state.tool_kind === 'mcp') {
+                    const srv = state.mcp_server || 'unknown';
+                    servers[srv] = servers[srv] || { server: srv, tools: [] };
+                    if (!servers[srv].tools.some(t => t.name === state.tool)) {
+                        servers[srv].tools.push({ name: state.tool, inputs, outputs, signal });
+                    }
+                } else if (!apis.some(a => a.name === state.tool)) {
+                    apis.push({ name: state.tool, inputs, outputs, signal });
+                }
+            });
+            integrationConfig = { mcpServers: Object.values(servers), apiTools: apis };
+        }
+
         function getToolSpec(state) {
             if (!state || !state.tool) return null;
+            const userSpec = findIntegrationSpec(state.tool);
+            if (userSpec) return userSpec;
             if (toolCatalog[state.tool]) return toolCatalog[state.tool];
             // Generic fallback for tools not in the catalog.
             return {
@@ -2706,10 +2854,12 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             return [...new Set(flow.states.filter(s => s.tool && s.tool_kind !== 'mcp').map(s => s.tool))].sort();
         }
 
-        function syncMcpMounts(flow) {
-            const servers = collectMcpServers(flow);
+        function syncMcpMounts() {
+            // Mount state follows the configured MCP servers (preserve existing toggles).
             const next = {};
-            servers.forEach((_, server) => { next[server] = mcpMounts[server] || false; });
+            integrationConfig.mcpServers.forEach(srv => {
+                next[srv.server] = mcpMounts[srv.server] || false;
+            });
             mcpMounts = next;
         }
 
@@ -2719,11 +2869,115 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             renderSkillSimulator();
         }
 
+        // --- Integration editor (the user-facing config UI) ----------------------
+        function intgEdit(kind, idx, toolIdx, field, value) {
+            if (kind === 'mcp') {
+                const srv = integrationConfig.mcpServers[idx];
+                if (!srv) return;
+                if (toolIdx === null || toolIdx === undefined) srv[field] = value;
+                else if (srv.tools[toolIdx]) srv.tools[toolIdx][field] = value;
+            } else {
+                const api = integrationConfig.apiTools[idx];
+                if (api) api[field] = value;
+            }
+        }
+
+        function addMcpServer() {
+            integrationConfig.mcpServers.push({ server: 'new_server', tools: [] });
+            renderIntegrationEditor();
+        }
+        function removeMcpServer(si) {
+            integrationConfig.mcpServers.splice(si, 1);
+            renderIntegrationEditor();
+        }
+        function addMcpTool(si) {
+            const srv = integrationConfig.mcpServers[si];
+            if (!srv) return;
+            srv.tools = srv.tools || [];
+            srv.tools.push({ name: `mcp__${srv.server}__tool`, inputs: '', outputs: '', signal: '' });
+            renderIntegrationEditor();
+        }
+        function removeMcpTool(si, ti) {
+            const srv = integrationConfig.mcpServers[si];
+            if (srv && srv.tools) srv.tools.splice(ti, 1);
+            renderIntegrationEditor();
+        }
+        function addApiTool() {
+            integrationConfig.apiTools.push({ name: 'new_api_tool', inputs: '', outputs: '', signal: '' });
+            renderIntegrationEditor();
+        }
+        function removeApiTool(ai) {
+            integrationConfig.apiTools.splice(ai, 1);
+            renderIntegrationEditor();
+        }
+        function reseedIntegration() {
+            seedIntegrationFromFlow(parseGeneratedFlow());
+            syncMcpMounts();
+            renderIntegrationEditor();
+            renderMcpPanel();
+            renderSkillSimulator();
+        }
+        function applyIntegration() {
+            syncMcpMounts();
+            renderMcpPanel();
+            renderSkillSimulator();
+        }
+
+        function renderIntegrationEditor() {
+            const host = document.getElementById('integration-editor');
+            if (!host) return;
+            const esc = escapeHtml;
+            const headRow = '<div class="intg-tool intg-head-row"><span>tool name</span><span>input (name:type)</span><span>output (name:type)</span><span>signal</span><span></span></div>';
+            let html = '<div class="intg-group"><div class="intg-group-title"><i data-lucide="server" style="width:16px;color:var(--accent);"></i> MCP Servers &amp; Tools</div>';
+            if (!integrationConfig.mcpServers.length) {
+                html += '<div class="intg-hint">尚未設定 MCP server。按上方「新增 MCP server」，或編譯含 MCP 工具的 SOP 自動帶入。</div>';
+            }
+            integrationConfig.mcpServers.forEach((srv, si) => {
+                html += `<div class="intg-server">
+                    <div class="intg-server-head">
+                        <i data-lucide="server" style="width:15px;color:var(--accent);"></i>
+                        <input class="intg-input" style="max-width:240px;" value="${esc(srv.server)}" oninput="intgEdit('mcp',${si},null,'server',this.value)" placeholder="server 名稱 (e.g. jira)">
+                        <button class="intg-btn tiny secondary" onclick="addMcpTool(${si})"><i data-lucide="plus" style="width:13px;"></i> 工具</button>
+                        <button class="intg-btn tiny danger" onclick="removeMcpServer(${si})"><i data-lucide="trash-2" style="width:13px;"></i></button>
+                    </div>
+                    ${(srv.tools && srv.tools.length) ? headRow : '<div class="intg-hint">此 server 尚無工具，按「工具」新增。</div>'}`;
+                (srv.tools || []).forEach((tool, ti) => {
+                    html += `<div class="intg-tool">
+                        <input class="intg-input" value="${esc(tool.name)}" oninput="intgEdit('mcp',${si},${ti},'name',this.value)" placeholder="mcp__server__tool">
+                        <input class="intg-input" value="${esc(tool.inputs)}" oninput="intgEdit('mcp',${si},${ti},'inputs',this.value)" placeholder="project_key:string, summary:string">
+                        <input class="intg-input" value="${esc(tool.outputs)}" oninput="intgEdit('mcp',${si},${ti},'outputs',this.value)" placeholder="issue_key:string, created:bool">
+                        <input class="intg-input" value="${esc(tool.signal)}" oninput="intgEdit('mcp',${si},${ti},'signal',this.value)" placeholder="created">
+                        <button class="intg-btn tiny danger" onclick="removeMcpTool(${si},${ti})"><i data-lucide="x" style="width:13px;"></i></button>
+                    </div>`;
+                });
+                html += '</div>';
+            });
+            html += '</div>';
+
+            html += '<div class="intg-group"><div class="intg-group-title"><i data-lucide="globe" style="width:16px;color:var(--secondary);"></i> API Tools</div>';
+            if (!integrationConfig.apiTools.length) {
+                html += '<div class="intg-hint">尚未設定 API。按上方「新增 API」。</div>';
+            } else {
+                html += '<div class="intg-api-row intg-head-row"><span>api name</span><span>input (name:type)</span><span>output (name:type)</span><span>signal</span><span></span></div>';
+            }
+            integrationConfig.apiTools.forEach((api, ai) => {
+                html += `<div class="intg-api-row">
+                    <input class="intg-input" value="${esc(api.name)}" oninput="intgEdit('api',${ai},null,'name',this.value)" placeholder="mes_event_lookup">
+                    <input class="intg-input" value="${esc(api.inputs)}" oninput="intgEdit('api',${ai},null,'inputs',this.value)" placeholder="tool_id:string, event_time:timestamp">
+                    <input class="intg-input" value="${esc(api.outputs)}" oninput="intgEdit('api',${ai},null,'outputs',this.value)" placeholder="event_count:int, is_duplicate:bool">
+                    <input class="intg-input" value="${esc(api.signal)}" oninput="intgEdit('api',${ai},null,'signal',this.value)" placeholder="is_duplicate">
+                    <button class="intg-btn tiny danger" onclick="removeApiTool(${ai})"><i data-lucide="x" style="width:13px;"></i></button>
+                </div>`;
+            });
+            html += '</div>';
+            host.innerHTML = html;
+            lucide.createIcons();
+        }
+
         // Render an advertised tool schema (description + input/output) — the kind of
         // contract a real MCP server exposes when it is mounted.
-        function renderToolSchema(flow, toolName) {
-            const st = flow.states.find(state => state.tool === toolName) || { tool: toolName, parameters: [] };
-            const spec = getToolSpec(st) || {};
+        function renderToolSchema(toolName) {
+            const spec = getToolSpec({ tool: toolName, parameters: [] }) || {};
             const tags = pairs => (pairs && pairs.length
                 ? pairs.map(([name, type]) => `<span class="mcp-tool-tag">${escapeHtml(name)}: ${escapeHtml(type)}</span>`).join('')
                 : '<span class="mcp-tool-tag">—</span>');
@@ -2741,14 +2995,13 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         function renderMcpPanel() {
             const panel = document.getElementById('mcp-mount-panel');
             if (!panel) return;
-            const flow = parseGeneratedFlow();
-            const servers = collectMcpServers(flow);
-            const apiTools = collectApiTools(flow);
             const cards = [];
 
-            servers.forEach((tools, server) => {
+            integrationConfig.mcpServers.forEach(srv => {
+                const server = srv.server;
+                const tools = (srv.tools || []).map(t => t.name);
                 const mounted = !!mcpMounts[server];
-                const schemas = [...tools].sort().map(tool => renderToolSchema(flow, tool)).join('');
+                const schemas = tools.map(renderToolSchema).join('');
                 cards.push(`
                     <div class="mcp-card ${mounted ? 'mounted' : ''}">
                         <div class="mcp-card-head">
@@ -2758,14 +3011,14 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                         <button class="mount-btn ${mounted ? 'is-mounted' : ''}" onclick="toggleMount('${escapeHtml(server)}')">
                             <i data-lucide="${mounted ? 'check' : 'plug-zap'}" style="width:15px;"></i> ${mounted ? '已連線 (點擊卸載)' : `掛載 ${escapeHtml(server)} MCP server`}
                         </button>
-                        <div class="mcp-io-label" style="margin-top:10px;">advertised tools (${tools.size})</div>
-                        ${schemas}
+                        <div class="mcp-io-label" style="margin-top:10px;">advertised tools (${tools.length})</div>
+                        ${schemas || '<span class="mcp-tool-tag">尚無工具</span>'}
                     </div>
                 `);
             });
 
-            if (apiTools.length) {
-                const schemas = apiTools.map(tool => renderToolSchema(flow, tool)).join('');
+            if (integrationConfig.apiTools.length) {
+                const schemas = integrationConfig.apiTools.map(a => renderToolSchema(a.name)).join('');
                 cards.push(`
                     <div class="mcp-card api">
                         <div class="mcp-card-head">
@@ -2773,7 +3026,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                             <span class="mcp-status on">直接可用</span>
                         </div>
                         <button class="mount-btn is-mounted" disabled><i data-lucide="check" style="width:15px;"></i> 內部 API 端點，無需掛載</button>
-                        <div class="mcp-io-label" style="margin-top:10px;">api endpoints (${apiTools.length})</div>
+                        <div class="mcp-io-label" style="margin-top:10px;">api endpoints (${integrationConfig.apiTools.length})</div>
                         ${schemas}
                     </div>
                 `);
@@ -2781,7 +3034,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
             panel.innerHTML = cards.length
                 ? cards.join('')
-                : '<p style="color: var(--text-muted);">此 SOP 未使用任何 API 或 MCP 工具。</p>';
+                : '<p style="color: var(--text-muted);">此 SOP 未使用任何 API 或 MCP 工具，可於上方整合設定新增。</p>';
             lucide.createIcons();
         }
 
@@ -3057,7 +3310,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         renderRuleAndReportBlocks();
         renderMarkdownPreview();
         renderFlowFromGeneratedJson();
-        syncMcpMounts(parseGeneratedFlow());
+        seedIntegrationFromFlow(parseGeneratedFlow());
+        syncMcpMounts();
+        renderIntegrationEditor();
         renderMcpPanel();
         resetSimulation();
     </script>
