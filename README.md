@@ -87,7 +87,13 @@ Each tool state's branch conditions act as the agent's **response-interpretation
 - **MCP**: check the `isError` flag, read `structuredContent`, inspect the `signal_field`, and
   match it against the branch conditions.
 
-The web demo (`index.html`) makes this interactive:
+The web demo is split into two pages sharing `assets/app.js` + `assets/styles.css`:
+
+- **Converter** (`index.html`): edit the SOP markdown → compile → review `SKILL.md` /
+  `flow.json` / quality report + the flow visualizer, then 「前往模擬器」 (hands the compiled
+  flow off to the Simulator via `localStorage`).
+- **Simulator** (`simulator.html`): loads the compiled flow (or a pasted `flow.json`) and
+  makes the integration interactive:
 
 - an **Integration Configuration** editor (seeded from the compiled `flow.json`) lets you
   **edit which MCP servers/tools and APIs the skill uses, plus each tool's input/output (I/O)

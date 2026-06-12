@@ -53,13 +53,13 @@ def _read(rel_path: str) -> str:
 
 @pytest.fixture(scope="module")
 def js_module(tmp_path_factory):
-    """Extract the pure compile functions from index.html into a CommonJS module."""
-    html = _read("index.html")
-    start = html.index("function detectToolMeta")
-    end = html.index("// Run compiler simulator")
+    """Extract the pure compile functions from assets/app.js into a CommonJS module."""
+    src_js = _read(os.path.join("assets", "app.js"))
+    start = src_js.index("function detectToolMeta")
+    end = src_js.index("// Run compiler simulator")
     if start < 0 or end < 0 or end <= start:
-        pytest.fail("could not locate the JS compile functions in index.html")
-    block = html[start:end] + "\nmodule.exports = { compileMarkdownToFlow };\n"
+        pytest.fail("could not locate the JS compile functions in assets/app.js")
+    block = src_js[start:end] + "\nmodule.exports = { compileMarkdownToFlow };\n"
     path = tmp_path_factory.mktemp("parity") / "compile.js"
     path.write_text(block, encoding="utf-8")
     return str(path)

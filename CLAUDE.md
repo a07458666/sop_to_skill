@@ -53,12 +53,19 @@ Output Skill bundle per SOP:
   SkillOpt (see `docs/ROADMAP.md`).
 - `tests/` — pytest suite: executor behaviour, the eval invariant, **golden
   snapshots** (`parser.py` output must match the committed `skills/*` bundles), and
-  **parity** (`index.html` JS compiles SOPs to the same graph as `parser.py`, run
+  **parity** (`assets/app.js` JS compiles SOPs to the same graph as `parser.py`, run
   under Node — the guardrail against the two implementations drifting).
-- `index.html` — a single-file interactive web demo (GitHub Pages). It re-implements
-  the compiler in JS (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`)
-  to stay at **parity with `parser.py`**, plus the flow visualizer, MCP mount panel,
-  and execution simulator. No build step; all inline.
+- `index.html` (**Converter**) + `simulator.html` (**Simulator**) — the web demo, split into
+  two GitHub Pages. Shared logic lives in `assets/app.js`, shared CSS in `assets/styles.css`
+  (both pages link them; no build step). `app.js` re-implements the compiler in JS
+  (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`) to stay at **parity
+  with `parser.py`** (enforced by `tests/test_parity.py`, which reads `assets/app.js`).
+  - **Converter**: SOP markdown editor → compile → SKILL.md/flow.json/quality report + flow
+    visualizer + 「前往模擬器」(`goToSimulator` persists state to `localStorage`).
+  - **Simulator**: loads the compiled flow from `localStorage` (or a pasted `flow.json` via
+    `loadPastedFlow`) → integration config editor + MCP mount panel + execution simulator.
+  - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`
+    or `initSimulator()`. Cross-page handoff via `STORAGE_KEY` (`persistState`/`loadState`).
 - `docs/PRODUCT.md` — product positioning (four-pillar loop: Compile/Enforce/Prove/Evolve,
   SOP-as-Code, north-star metrics). `docs/ROADMAP.md` — schedule + acceptance criteria;
   phase 1 (M0–M2.5) done, phase 2 is G1–G4 (G1 = executor as a real MCP server, first).
@@ -67,7 +74,7 @@ Output Skill bundle per SOP:
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
 - `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
-  lint (`ruff check parser.py executor.py eval/ tests/` + `html-validate index.html`),
+  lint (`ruff check parser.py executor.py optimizer.py evolve.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html` + `node --check assets/app.js`),
   test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
   GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
@@ -87,13 +94,13 @@ In a `**System/Tool**` line, declare the integration:
   `mcp__<server>__<tool>` naming convention.
 - Detection: explicit marker > `mcp__` prefix > default `api`. `mcp_server` is the
   segment between `mcp__` and the next `__`, or the `(MCP: server)` value.
-- Implemented identically in `parser.py:detect_tool_meta` and `index.html:detectToolMeta`.
+- Implemented identically in `parser.py:detect_tool_meta` and `assets/app.js:detectToolMeta`.
 
 ### Output contract: Returns / Signal (M2)
 A tool step may declare its output contract in the SOP markdown:
 - `**Returns**: \`f1\`, \`f2\`` → `returns` (output field names).
 - `**Signal**: \`f1\`` → `signal_field` (the field the agent inspects to route; should be in `returns`).
-Parsed identically in `parser.py` and `index.html:compileMarkdownToFlow`, written into
+Parsed identically in `parser.py` and `assets/app.js:compileMarkdownToFlow`, written into
 `flow.json`, rendered as a **Response Interpretation** line in `SKILL.md`, and validated
 (non-blocking) in the quality report's integration table (Returns/Signal columns).
 
@@ -103,7 +110,7 @@ Each state's `next_states` keys are the agent's **response-interpretation rules*
 - MCP: check `isError`, read `structuredContent`, inspect `signal_field`, match a branch.
 Surfaced in the node inspector, simulator, and quality report.
 
-## Web demo concepts (index.html)
+## Web demo concepts (assets/app.js, shared by both pages)
 
 - **Tool catalog** (`toolCatalog`): a simulated registry. Each tool advertises a
   description + input/output schema and returns a realistic, SQL-like result row
@@ -134,7 +141,7 @@ Surfaced in the node inspector, simulator, and quality report.
 
 ## Conventions
 
-- Keep `parser.py` (Python) and `index.html` (JS) **in sync** — they implement the
+- Keep `parser.py` (Python) and `assets/app.js` (JS) **in sync** — they implement the
   same compile + quality logic; changing one usually means changing the other.
   `tests/test_parity.py` enforces this for the compile path (structural graph).
 - When `parser.py` output changes, **regenerate the committed skills** (see below).
@@ -147,9 +154,8 @@ Surfaced in the node inspector, simulator, and quality report.
 ruff check parser.py executor.py eval/ tests/
 python3 -m pytest tests/ -q
 python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
-html-validate index.html
-# JS syntax check of the inline <script>:
-node -e 'const fs=require("fs");const h=fs.readFileSync("index.html","utf8");const re=/<script>([\s\S]*?)<\/script>/g;let m,l=null;while((m=re.exec(h)))l=m[1];fs.writeFileSync("/tmp/m.js",l)'; node --check /tmp/m.js
+html-validate index.html simulator.html
+node --check assets/app.js   # shared web-demo JS
 # Regenerate committed skills (offline fallback; no GEMINI_API_KEY needed):
 python3 parser.py --input sample_sop.md --output-dir skills/tool_fault_investigation --rules sop_rule.md
 python3 parser.py --input examples/furnace_temperature_drift_sop.md --output-dir skills/furnace_temperature_drift --rules sop_rule.md
