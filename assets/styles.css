@@ -1073,3 +1073,11 @@
         .btn-cta { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 14px 26px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 9px; }
         .btn-cta:hover { opacity: 0.9; }
         #flow-paste { width: 100%; min-height: 150px; margin-bottom: 12px; }
+        .artifacts-summary {
+            cursor: pointer; font-size: 1.15rem; font-weight: 600; color: var(--text);
+            display: flex; align-items: center; gap: 10px; list-style: none;
+        }
+        .artifacts-summary::-webkit-details-marker { display: none; }
+        .artifacts-summary::before { content: "\25B8"; color: var(--text-muted); transition: transform 0.15s; }
+        details[open] > .artifacts-summary::before { transform: rotate(90deg); }
+        #sim-skill-md, #sim-quality-report { max-height: 360px; overflow: auto; }

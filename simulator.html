@@ -34,6 +34,22 @@
             <button class="intg-btn" onclick="loadPastedFlow()"><i data-lucide="check" style="width:15px;"></i> 載入此 flow.json</button>
         </section>
 
+        <!-- Compiled artifacts (for context; the simulator only executes flow.json) -->
+        <section class="glass-card">
+            <details id="artifacts-panel">
+                <summary class="artifacts-summary"><i data-lucide="package" style="width:18px;"></i> 已編譯產物 (SKILL.md / 品質報告)</summary>
+                <p style="color: var(--text-muted); margin: 14px 0; font-size: 0.92rem;">這些是 Converter 編譯出的人類 / Agent 可讀文件，<strong>僅供對照</strong>；模擬器實際執行的是 <code>flow.json</code>。</p>
+                <div class="editor-container" style="margin-bottom: 16px;">
+                    <div class="panel-header"><div class="panel-title"><i data-lucide="file-text" style="width:16px;"></i> SKILL.md</div></div>
+                    <div id="sim-skill-md" class="code-display"></div>
+                </div>
+                <div class="editor-container">
+                    <div class="panel-header"><div class="panel-title"><i data-lucide="clipboard-check" style="width:16px;"></i> sop_quality_report.md</div></div>
+                    <div id="sim-quality-report" class="code-display"></div>
+                </div>
+            </details>
+        </section>
+
         <!-- Interactive Flowchart Visualizer -->
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>

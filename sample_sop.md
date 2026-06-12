@@ -21,6 +21,7 @@ This SOP defines the investigation workflow for diagnosing, containing, and reso
 *   **System/Tool**: `tool_hold_request` (Parameters: `tool_id`, `hold_reason`)
 *   **Returns**: `hold_id`, `applied`, `eqp_state`
 *   **Signal**: `applied`
+*   **Approval**: required
 *   **Branching Logic**:
     *   **If hold is applied successfully**: Proceed to **Step 3 (Check Lot Exposure)**.
     *   **If hold cannot be applied**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).
@@ -57,6 +58,7 @@ This SOP defines the investigation workflow for diagnosing, containing, and reso
 *   **System/Tool**: `corrective_action_create` (Parameters: `tool_id`, `root_cause`, `action_owner`)
 *   **Returns**: `ca_id`, `approval_state`, `owner`
 *   **Signal**: `approval_state`
+*   **Approval**: required
 *   **Branching Logic**:
     *   **If corrective action is approved**: Proceed to **Step 7 (Verify Tool Recovery)**.
     *   **If corrective action is rejected**: Transition to **Escalate To Equipment Engineering** (State: `escalate_to_equipment_engineering`).

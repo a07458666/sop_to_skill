@@ -93,6 +93,10 @@ class State(BaseModel):
         default=None,
         description="The primary response field the agent inspects to choose a branch (e.g. 'exposed_lot_count'). Should be one of `returns`. Null when not applicable."
     )
+    requires_approval: Optional[bool] = Field(
+        default=None,
+        description="True if this state is a human-in-the-loop approval gate that must be approved before advancing (from the step's `**Approval**: required` line). False to explicitly opt out of a gate; null to fall back to the executor's keyword inference."
+    )
     next_states: Optional[Dict[str, str]] = Field(
         default=None,
         description="Mapping of transition keys (e.g. 'success', 'failure', 'true', 'false') to target state IDs. Empty for end_states."
@@ -279,6 +283,14 @@ def assess_sop_quality(content: str, flow_data: StateMachine, rules_content: str
     else:
         report += "- 此 SOP 沒有工具呼叫，無 API / MCP 整合需驗證。\n"
 
+    approval_gates = [s.id for s in flow_data.states if s.requires_approval]
+    report += "\n## 核准閘 (Approval Gates)\n\n"
+    if approval_gates:
+        gates = "、".join(f"`{gate}`" for gate in approval_gates)
+        report += f"- 下列 state 已用 `**Approval**: required` 標註為人機協同核准閘，Agent 必須取得核准才能前進：{gates}。\n"
+    else:
+        report += "- 此 SOP 未以 `**Approval**: required` 明確標註核准閘；executor 仍會依慣例關鍵字（如 hold / escalate / release）於執行期推斷。\n"
+
     if rules_content:
         report += "\n## 規則摘要\n\n"
         report += "本報告檢查了標題、目的、編號步驟、描述、工具宣告、分支邏輯、終點狀態、transition target、end state 可達性，以及 API / MCP 整合（參數契約、回傳欄位 Returns、判讀欄位 Signal、回傳判讀規則、MCP server 掛載需求）。\n"
@@ -370,6 +382,7 @@ def offline_fallback_parse(content: str) -> dict:
         params = []
         returns = []
         signal_field = None
+        requires_approval = None
         next_states = {}
 
         # Parse section details
@@ -395,6 +408,9 @@ def offline_fallback_parse(content: str) -> dict:
                 signal_match = re.search(r"`([^`]+)`", line_str)
                 if signal_match:
                     signal_field = signal_match.group(1)
+            elif re.match(r"[-*]\s+\*\*(?:Requires\s+)?Approval\*\*:", line_str, re.IGNORECASE):
+                approval_val = line_str.split(":", 1)[1].strip().lower()
+                requires_approval = approval_val in ("required", "yes", "true", "需要")
             elif "If " in line_str:
                 # Basic parsing for branching conditions
                 cond_match = re.search(r"\*\*If\s+([^:]+)\*\*:\s*(.+)", line_str)
@@ -420,6 +436,7 @@ def offline_fallback_parse(content: str) -> dict:
             "parameters": params if params else None,
             "returns": returns if returns else None,
             "signal_field": signal_field,
+            "requires_approval": requires_approval,
             "next_states": next_states if next_states else None
         })
 
@@ -531,6 +548,11 @@ def generate_skill_md(flow_data: StateMachine) -> str:
                     f"- **Response Interpretation**: verify {check}, read {channel}{signal}, "
                     "then match the outcome against a branch below.\n"
                 )
+        if s.requires_approval:
+            instructions += (
+                "- **Approval Gate**: requires human-in-the-loop approval before advancing; "
+                "do not transition until a human approves.\n"
+            )
         if s.next_states:
             instructions += "- **Branching / Next States**:\n"
             for cond, target in s.next_states.items():

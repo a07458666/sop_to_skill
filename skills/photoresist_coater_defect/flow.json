@@ -15,6 +15,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "coating defect is confirmed": "hold_affected_tool_and_lots",
         "defect is not coating related": "route_to_process_owner"
@@ -34,6 +35,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "containment is complete": "review_coater_process_data",
         "containment fails": "escalate_to_manufacturing_lead"
@@ -53,6 +55,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "abnormal process signal is found": "run_coater_diagnostics",
         "no abnormal process signal is found": "review_material_history"
@@ -71,6 +74,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "equipment issue is identified": "create_corrective_action",
         "equipment issue is not identified": "review_material_history"
@@ -89,6 +93,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "material issue is suspected": "open_mrb_case",
         "material issue is not suspected": "escalate_to_process_engineering"
@@ -108,6 +113,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "corrective action is approved": "verify_coater_recovery",
         "corrective action is rejected": "escalate_to_process_engineering"
@@ -126,6 +132,7 @@
       ],
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": {
         "verification passes": "release_coater_to_production",
         "verification fails": "escalate_to_process_engineering"
@@ -141,6 +148,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -153,6 +161,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -165,6 +174,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -177,6 +187,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     },
     {
@@ -189,6 +200,7 @@
       "parameters": null,
       "returns": null,
       "signal_field": null,
+      "requires_approval": null,
       "next_states": null
     }
   ]

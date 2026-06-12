@@ -48,6 +48,16 @@
 - 判讀規則：API 先驗 HTTP `status`、讀 `body.data`；MCP 先驗 `isError`、讀 `structuredContent`；再依 **Signal** 欄位值比對 `**If ...**:` 分支後決定下一步。
 - Returns / Signal 為選填但建議補上；缺少時品質報告會以「修改建議」提示（不擋轉換）。
 
+## 核准閘標註（Approval）
+
+- **Approval**：把某個步驟標記為「人機協同核准閘」，Agent 必須先取得人類核准才能離開該步驟。
+  - 格式：另起一行 `**Approval**: required`（值可為 `required` / `yes` / `true` / `需要`）。
+  - 若要明確宣告「不需要核准」（覆蓋下方的關鍵字推斷），寫 `**Approval**: no`。
+  - 範例：在「機台停用」「開立改善措施」這類高風險步驟加上 `**Approval**: required`。
+- 寫進 `flow.json` 的 `requires_approval` 欄位（`true` / `false` / `null`）。
+- 未標註（`null`）時，executor 仍會依慣例關鍵字（如 hold / escalate / release / mrb 等）於執行期推斷是否為核准閘；明確標註一律優先於關鍵字推斷。
+- SKILL.md 會在該 state 渲染 **Approval Gate** 提示，品質報告也會列出所有核准閘。
+
 ## API 與 MCP 整合標註
 
 - 每個工具呼叫應標明整合方式：API 或 MCP。

@@ -102,6 +102,7 @@
 ### Step 2: 機台停用管制
 *   **Description**: 停止受影響機台的新批次進站，並在調查期間將機台設為 engineering hold。
 *   **System/Tool**: `tool_hold_request` (參數: `tool_id`, `hold_reason`)
+*   **Approval**: required
 *   **Branching**:
     *   **If hold 套用成功**: 進入 **Step 3 (確認受影響批次)**
     *   **If hold 無法套用**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)
@@ -130,6 +131,7 @@
 ### Step 6: 建立改善措施
 *   **Description**: 定義修復計畫、驗證需求、責任人與機台 release criteria。
 *   **System/Tool**: `corrective_action_create` (參數: `tool_id`, `root_cause`, `action_owner`)
+*   **Approval**: required
 *   **Branching**:
     *   **If 改善措施核准**: 進入 **Step 7 (驗證機台復歸)**
     *   **If 改善措施駁回**: 轉移至 **升級設備工程** (State: `escalate_to_equipment_engineering`)

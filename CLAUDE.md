@@ -24,8 +24,9 @@ Output Skill bundle per SOP:
   `assess_sop_quality()` builds the quality report including the API/MCP validation table.
 - `executor.py` — the **runtime enforcement layer** (M1). `SkillExecutor` loads a
   `flow.json` (reusing the parser's schema) and enforces it as an execution contract:
-  legal-only tool calls + outcomes, human-in-the-loop **approval gates** (inferred via
-  `DEFAULT_APPROVAL_KEYWORDS`, e.g. hold/escalate/release), and a serializable audit trail.
+  legal-only tool calls + outcomes, human-in-the-loop **approval gates** (explicit
+  `state.requires_approval` wins; null falls back to `DEFAULT_APPROVAL_KEYWORDS`, e.g.
+  hold/escalate/release), and a serializable audit trail.
   CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`.
 - `optimizer.py` — **structured self-evolution** of a flow (M2.5), the structured analogue
   of SkillOpt. Proposes **bounded graph edits** (`Edit`: add_transition / set_signal_field),
@@ -85,6 +86,7 @@ A SOP compiles to a state machine. Each `State` has: `id`, `type`
 (`action` | `decision` | `end_state`), `description`, `tool`, `tool_kind`
 (`api` | `mcp` | null), `mcp_server`, `parameters` (input fields), `returns`
 (output fields), `signal_field` (the primary output field the agent reads to route),
+`requires_approval` (`true`/`false`/null — human-in-the-loop approval gate),
 `next_states` (map of free-text outcome → target state id).
 
 ### API vs MCP tools (SOP annotation)
@@ -103,6 +105,16 @@ A tool step may declare its output contract in the SOP markdown:
 Parsed identically in `parser.py` and `assets/app.js:compileMarkdownToFlow`, written into
 `flow.json`, rendered as a **Response Interpretation** line in `SKILL.md`, and validated
 (non-blocking) in the quality report's integration table (Returns/Signal columns).
+
+### Approval gate (requires_approval)
+A step may be marked a human-in-the-loop **approval gate**: `**Approval**: required`
+(`required`/`yes`/`true`/`需要` → `true`; `no`/`false` → explicit opt-out) → `requires_approval`.
+Parsed identically in `parser.py` and `assets/app.js:compileMarkdownToFlow`, written to
+`flow.json`, rendered as an **Approval Gate** line in `SKILL.md` and an Approval-Gates
+section in the quality report. The executor/MCP server block advancing past an unapproved
+gate; explicit `requires_approval` wins over `DEFAULT_APPROVAL_KEYWORDS` inference (null →
+fall back to keywords). The web simulator enforces it via `approveCurrentState()` (keyed on
+the explicit field only).
 
 ### Response interpretation (how the agent routes)
 Each state's `next_states` keys are the agent's **response-interpretation rules**:

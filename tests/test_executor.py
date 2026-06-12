@@ -157,3 +157,30 @@ def test_approval_gates_are_inferred():
     # place_tool_on_hold / escalate / release should be inferred as gates
     assert "place_tool_on_hold" in ex._approval_states
     assert "escalate_to_equipment_engineering" not in ex._approval_states  # end_state excluded
+
+
+def _flow_dict():
+    with open(FLOW_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def test_explicit_requires_approval_true_forces_gate():
+    # A state with no approval keyword in its id/description becomes a gate when
+    # `requires_approval` is explicitly True in the schema.
+    data = _flow_dict()
+    for state in data["states"]:
+        if state["id"] == "check_lot_exposure":
+            state["requires_approval"] = True
+    ex = SkillExecutor(StateMachine(**data))
+    assert "check_lot_exposure" in ex._approval_states
+
+
+def test_explicit_requires_approval_false_overrides_keyword():
+    # `requires_approval: False` opts a state out even when its id matches a keyword
+    # (place_tool_on_hold would otherwise be inferred via the "hold" keyword).
+    data = _flow_dict()
+    for state in data["states"]:
+        if state["id"] == "place_tool_on_hold":
+            state["requires_approval"] = False
+    ex = SkillExecutor(StateMachine(**data))
+    assert "place_tool_on_hold" not in ex._approval_states
