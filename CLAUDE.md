@@ -34,6 +34,12 @@ Output Skill bundle per SOP:
   Candidates come from `detect_gaps` (a validation rollout needing an undefined outcome);
   the gate uniquely selects the right target because downstream outcomes must also match.
   CLI: `--flow`, `--scenarios`, `--out`, `--budget`, `--drop` (demo aid to create a gap).
+- `mcp_server.py` — **executor as an MCP server** (G1). Wraps `SkillExecutor` and speaks
+  MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
+  `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,
+  `sop_report_outcome` (rejects undefined outcomes, returns legal ones), `sop_request_approval`,
+  `sop_call_tool` (gate-checks tool calls), `sop_audit_trail`. `handle()` is pure/unit-tested;
+  `serve_stdio()` is the I/O loop a real agent client spawns. Run: `python mcp_server.py --flow ...`.
 - `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
   `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
   compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /

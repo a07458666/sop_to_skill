@@ -130,6 +130,30 @@ python eval/run_eval.py --check    # also fails CI unless compiled beats baselin
 Representative result (10 scenarios, 4 SOPs): illegal-action rate **28% → 0%**,
 correct-end rate **60% → 100%**, all illegal attempts blocked by the executor.
 
+## MCP server: a real agent under enforcement
+
+`mcp_server.py` exposes the executor as a Model Context Protocol server so a real agent
+(e.g. Claude) can drive a SOP under enforcement — not just the simulated agents in `eval/`.
+It speaks MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency.
+
+```bash
+python mcp_server.py --flow skills/tool_fault_investigation/flow.json
+```
+
+Tools exposed to the agent:
+
+| Tool | Purpose |
+| --- | --- |
+| `sop_start` | begin a session from a `flow.json` |
+| `sop_current_state` | current description, tool, parameters/returns/signal, legal outcomes |
+| `sop_report_outcome` | advance via an outcome; **unknown outcomes are rejected** with the legal list |
+| `sop_request_approval` | pass a human-in-the-loop approval gate |
+| `sop_call_tool` | gate-check a tool call (only the state's declared tool is allowed) |
+| `sop_audit_trail` | the serializable compliance trail |
+
+The same enforcement guarantees from the eval (no illegal transitions, approval gates,
+audit trail) now apply to a live agent over the wire.
+
 ## Structured self-evolution (optimizer)
 
 `optimizer.py` evolves a `flow.json` the way SkillOpt evolves a `SKILL.md` — but with

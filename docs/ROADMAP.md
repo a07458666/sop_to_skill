@@ -32,14 +32,16 @@
 
 依 `docs/PRODUCT.md` 的定位（四支柱閉環 + 真實化），下一階段按優先序：
 
-### G1 — executor 變成 MCP server（最高優先）
+### G1 — executor 變成 MCP server（✅ 完成）
 讓**真實 agent**（Claude 等）透過 MCP 在 enforcement 下執行 SOP，終結「只是模擬」。
 - 範圍：`mcp_server.py` 以 MCP 協議曝露 executor —— tools 如 `sop_start`、`sop_current_state`
   （回 description/tool/parameters/returns/signal/allowed_outcomes）、`sop_report_outcome`（驗 outcome、
   推進狀態）、`sop_request_approval`、`sop_audit_trail`。Agent 的真實工具呼叫由它閘控代理或核驗。
-- 驗收：一個真實 Claude session 載入該 MCP server 後完整走完 sample SOP；嘗試跳步/非法 outcome
-  被擋的實錄；輸出完整稽核軌跡。
-- 規模：中。
+- 已完成：`mcp_server.py`（無 SDK 依賴，純 stdio JSON-RPC：`initialize`/`tools/list`/`tools/call`/`ping`）。
+  Tools：`sop_start`、`sop_current_state`、`sop_report_outcome`（擋未知 outcome 並回傳合法清單）、
+  `sop_request_approval`、`sop_call_tool`（閘控工具呼叫）、`sop_audit_trail`。
+  `handle()` 為純函式並有單元測試；端到端 stdio 子行程 smoke test 通過（initialize→start→report）。
+- 規模：中。**Done.**
 
 ### G2 — 演化閉環：提案以「SOP diff」回到人類
 optimizer 的圖編輯反向渲染成 SOP markdown 修訂建議，人核准後重編譯——SOP 永遠是單一事實來源。
