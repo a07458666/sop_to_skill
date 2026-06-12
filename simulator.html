@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP-to-Skill: Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body data-page="simulator">
+
+    <div class="container">
+        <nav class="topnav">
+            <a href="index.html"><i data-lucide="wand-2" style="width:16px;"></i> Converter</a>
+            <a href="simulator.html" class="active"><i data-lucide="play" style="width:16px;"></i> Simulator</a>
+        </nav>
+
+        <header>
+            <div class="badge">Runtime Simulator</div>
+            <h1>Skill 執行模擬器</h1>
+            <p>載入 Converter 編譯出的 flow.json，設定 API / MCP 整合，並模擬 Agent 在強制流程下如何調用與判讀回傳。</p>
+        </header>
+
+        <!-- Load flow.json -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="upload"></i> 載入要模擬的 Skill (flow.json)</h2>
+            <p class="intg-hint" id="load-status">載入中…</p>
+            <div class="editor-container">
+                <textarea id="flow-paste" class="rule-editor" placeholder="（選用）在此貼上 flow.json 以覆蓋目前載入的內容…"></textarea>
+            </div>
+            <button class="intg-btn" onclick="loadPastedFlow()"><i data-lucide="check" style="width:15px;"></i> 載入此 flow.json</button>
+        </section>
+
+        <!-- Interactive Flowchart Visualizer -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API / MCP、調用參數、回傳判讀」與「條件路由跳轉邏輯」。</p>
+
+            <div class="flow-legend">
+                <span><span class="swatch" style="background: var(--secondary);"></span> API action（REST 查詢）</span>
+                <span><span class="swatch" style="background: var(--accent);"></span> MCP action（MCP server 工具）</span>
+                <span><span class="swatch" style="background: var(--accent); opacity:0.55;"></span> Decision（純判斷）</span>
+                <span><span class="swatch" style="background: var(--green);"></span> End state（終點）</span>
+                <span><span class="swatch line"></span> 迴圈 / 回邊 (loop)</span>
+            </div>
+
+            <div class="flow-container" id="flow-container"></div>
+
+            <!-- Inspector Panel -->
+            <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-placeholder">
+                    <i data-lucide="info"></i>
+                    <span>點擊上方流程圖節點，查看編譯後裝載至 Agent 的細節資訊。</span>
+                </div>
+            </div>
+
+        </section>
+        <!-- API / MCP Integration Configuration -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="settings-2"></i> API / MCP 整合設定 (Integration Configuration)</h2>
+            <p class="intg-hint">編譯後會依 <code>flow.json</code> 的工具、參數、<code>Returns</code>、<code>Signal</code> 自動帶入下方設定。你可以<strong>編輯要使用的 MCP server 與其工具、設定要測試的 API、以及每個工具的輸入/輸出（I/O）欄位與判讀 Signal</strong>。按「套用設定」後，下方的掛載面板、節點檢視器與執行模擬器都會依此設定顯示 skill 實際如何調用 API / MCP 並判讀回傳。</p>
+            <div class="intg-toolbar">
+                <button class="intg-btn" onclick="applyIntegration()"><i data-lucide="check-check" style="width:15px;"></i> 套用設定（讀取工具 / 輸出）</button>
+                <button class="intg-btn secondary" onclick="addMcpServer()"><i data-lucide="server" style="width:15px;"></i> 新增 MCP server</button>
+                <button class="intg-btn secondary" onclick="addApiTool()"><i data-lucide="globe" style="width:15px;"></i> 新增 API</button>
+                <button class="intg-btn secondary" onclick="reseedIntegration()"><i data-lucide="rotate-ccw" style="width:15px;"></i> 依 SOP 重設</button>
+            </div>
+            <div id="integration-editor"></div>
+        </section>
+        <!-- MCP / API Runtime Mounting & Validation -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="plug"></i> MCP Server 掛載與工具驗證 (Runtime Mount &amp; Validation)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">編譯時會驗證每個 <code>API</code> / <code>MCP</code> 工具的「參數契約」與「回傳判讀規則」（詳見上方 SOP 品質報告）。<code>MCP</code> 工具需先掛載對應 server，下方執行模擬器才能成功呼叫；<code>API</code> 工具則以 REST endpoint 直接呼叫。</p>
+            <div class="mcp-grid" id="mcp-mount-panel"></div>
+        </section>
+        <!-- Skill Execution Simulator -->
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器 (API / MCP Call Simulation)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 <code>flow.json</code> 的 start state 開始。每個工具 state 會模擬實際的 <code>API</code> / <code>MCP</code> 呼叫與回傳，並示範 Agent 如何<strong>判讀回傳值</strong>以決定下一步路由。</p>
+            <div class="simulator-layout">
+                <div class="sim-state-card" id="simulator-current-state"></div>
+                <div class="sim-history" id="simulator-history"></div>
+            </div>
+            <div class="sim-controls">
+                <button class="sim-control-btn" id="sim-back-btn" onclick="undoSimulation()"><i data-lucide="undo-2" style="width:16px;"></i> 上一步</button>
+                <button class="sim-control-btn" onclick="resetSimulation()"><i data-lucide="rotate-ccw" style="width:16px;"></i> 重新開始</button>
+            </div>
+        </section>
+        <footer>
+            <p>SOP-to-Skill Compiler Concept Guide &copy; 2026. Powered by Google Gemini.</p>
+        </footer>
+    </div>
+    <script src="assets/app.js"></script>
+</body>
+</html>

@@ -87,10 +87,22 @@ Each tool state's branch conditions act as the agent's **response-interpretation
 - **MCP**: check the `isError` flag, read `structuredContent`, inspect the `signal_field`, and
   match it against the branch conditions.
 
-The web demo (`index.html`) makes this interactive: a **MCP Server 掛載** panel lets you
-mount/unmount the servers referenced by the SOP (MCP tool calls are blocked until mounted),
-and the **execution simulator** shows the simulated request payload, the verification rule,
-and the mock API/MCP response for each routing choice.
+The web demo is split into two pages sharing `assets/app.js` + `assets/styles.css`:
+
+- **Converter** (`index.html`): edit the SOP markdown → compile → review `SKILL.md` /
+  `flow.json` / quality report + the flow visualizer, then 「前往模擬器」 (hands the compiled
+  flow off to the Simulator via `localStorage`).
+- **Simulator** (`simulator.html`): loads the compiled flow (or a pasted `flow.json`) and
+  makes the integration interactive:
+
+- an **Integration Configuration** editor (seeded from the compiled `flow.json`) lets you
+  **edit which MCP servers/tools and APIs the skill uses, plus each tool's input/output (I/O)
+  fields and the routing `signal`** — so you can see and shape exactly how the skill would
+  call API/MCP and read the response;
+- a **MCP Server 掛載** panel lets you mount/unmount the configured servers (MCP tool calls
+  are blocked until mounted);
+- the **execution simulator** shows the simulated request payload, the verification rule,
+  and the mock API/MCP response (built from your configured I/O) for each routing choice.
 
 ## Executor: enforcing the flow at runtime
 

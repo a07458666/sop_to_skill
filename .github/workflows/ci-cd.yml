@@ -46,7 +46,10 @@ jobs:
         run: npm install -g html-validate
 
       - name: Validate HTML
-        run: html-validate index.html
+        run: html-validate index.html simulator.html
+
+      - name: Check shared JS syntax
+        run: node --check assets/app.js
 
   # ── Job 2: Test (executor + eval) ────────────────────────────────────────
   test:
