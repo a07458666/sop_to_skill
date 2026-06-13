@@ -61,6 +61,7 @@ optimizer 的圖編輯反向渲染成 SOP markdown 修訂建議，人核准後�
 SOP registry（版本、狀態機 diff）、核准流（誰能放行哪些閘）、RBAC-lite、執行可觀測性。
 - 驗收：一份 SOP 的兩個版本可並存、回溯；每個核准有 actor 與時間戳；稽核可匯出。
 - 規模：大。最後做——前三者把價值做實，G4 把它包成企業可買的形狀。
+- 進度：✅ **狀態機 diff**（`flowdiff.py`）——兩版 `flow.json` 的圖層級差異（新增/移除 state、欄位變更含 `requires_approval`、分支 add/remove/retarget），結構化 dict + 可審查 markdown 報告，`--check` 可當 CI 閘。後續：SOP registry/版本、核准流（actor/時間戳）、RBAC-lite、可觀測性。
 
 **優先序與依賴：** G1 → G3（用 G1 的真實路徑跑量測）→ G2 → G4。
 

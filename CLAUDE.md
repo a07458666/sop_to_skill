@@ -41,6 +41,13 @@ Output Skill bundle per SOP:
   after approval. `apply_edit_to_markdown` maps a state id → its step section via
   `parser.make_state_id`; `evolve_sop()` runs compile→optimize→render. CLI: `--sop`,
   `--scenarios`, `--flow-key`, `--drop-branch` (demo), `--apply`.
+- `flowdiff.py` — **structured state-machine diff** (G4 governance primitive). Diffs two
+  `flow.json` versions at the graph level: states added/removed, per-state field changes
+  (tool/params/returns/signal/`requires_approval`/type/description) and transitions
+  added/removed/retargeted. `diff_flows()` → structured dict; `render_markdown()` →
+  reviewable zh-TW report; complements `evolve.py` (markdown diff) with the graph view.
+  Deterministic/offline, reuses the parser schema. CLI: `--old`, `--new`, `--format md|json`,
+  `--check` (exit 1 if the flows differ — CI gate).
 - `mcp_server.py` — **executor as an MCP server** (G1). Wraps `SkillExecutor` and speaks
   MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
   `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,
@@ -75,7 +82,7 @@ Output Skill bundle per SOP:
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
 - `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
-  lint (`ruff check parser.py executor.py optimizer.py evolve.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html` + `node --check assets/app.js`),
+  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html` + `node --check assets/app.js`),
   test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
   GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
@@ -163,7 +170,7 @@ Surfaced in the node inspector, simulator, and quality report.
 ## Verify before pushing
 
 ```bash
-ruff check parser.py executor.py eval/ tests/
+ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/
 python3 -m pytest tests/ -q
 python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
 html-validate index.html simulator.html
