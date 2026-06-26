@@ -23,11 +23,11 @@
             <h1>SOP-to-Skill Compiler</h1>
             <p>將繁複的「標準作業程序（SOP）」文檔，編譯為可被 Agent 載入的合法 Skill 目錄。</p>
         </header>
-        <!-- Core Concept Section -->
-        <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="lightbulb"></i> 設計思維：為什麼要轉換？</h2>
-            <div class="concept-grid">
-                
+        <!-- Core Concept Section (collapsed: marketing, not the task) -->
+        <details class="glass-card">
+            <summary class="artifacts-summary"><i data-lucide="lightbulb"></i> 設計思維：為什麼要把 SOP 轉成 Skill？</summary>
+            <div class="concept-grid" style="margin-top:18px;">
+
                 <!-- Left: Raw SOP -->
                 <div class="concept-box left">
                     <h3><i data-lucide="file-text"></i> 傳統 Markdown SOP</h3>
@@ -56,11 +56,11 @@
                 </div>
 
             </div>
-        </section>
-        <!-- SOP Conversion Rules -->
-        <section class="glass-card">
-            <div class="section-title-row">
-                <h2 class="section-title"><i data-lucide="list-checks"></i> SOP 轉換規則 (sop_rule.md)</h2>
+        </details>
+        <!-- SOP Conversion Rules (collapsed: advanced authoring) -->
+        <details class="glass-card">
+            <summary class="artifacts-summary"><i data-lucide="list-checks"></i> 進階：SOP 轉換規則 (sop_rule.md)</summary>
+            <div class="section-title-row" style="margin-top:14px; justify-content:flex-end;">
                 <button class="icon-btn" id="edit-rule-btn" onclick="toggleRuleEdit()" title="編輯 SOP 轉換規則">
                     <i data-lucide="pencil" style="width:18px;"></i>
                 </button>
@@ -68,7 +68,7 @@
             <div class="editor-container">
                 <textarea id="sop-rule-content" class="rule-editor" readonly oninput="syncRuleContentFromEditor()"></textarea>
             </div>
-        </section>
+        </details>
         <!-- Interactive Playground -->
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="terminal"></i> 互動式編譯沙盒 (Playground)</h2>
@@ -191,16 +191,16 @@
 
             </div>
         </section>
-        <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="clipboard-check"></i> SOP 品質報告 (sop_quality_report.md)</h2>
-            <div class="editor-container">
+        <details class="glass-card" id="quality-report-card">
+            <summary class="artifacts-summary"><i data-lucide="clipboard-check"></i> SOP 品質報告 <span id="quality-status-badge" class="status-badge"></span></summary>
+            <div class="editor-container" style="margin-top:16px;">
                 <div id="quality-report-content" class="code-display"></div>
             </div>
-        </section>
-        <!-- Interactive Flowchart Visualizer -->
+        </details>
+        <!-- Interactive Flowchart Visualizer (the hero artifact) -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API / MCP、調用參數、回傳判讀」與「條件路由跳轉邏輯」。</p>
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點任一節點，查看它呼叫的工具、回傳判讀與路由。</p>
 
             <div class="flow-legend">
                 <span><span class="swatch" style="background: var(--secondary);"></span> API action（REST 查詢）</span>
