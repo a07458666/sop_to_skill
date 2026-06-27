@@ -13,16 +13,27 @@
 <body data-page="converter">
 
     <div class="container">
-        <nav class="topnav">
-            <a href="index.html" class="active"><i data-lucide="wand-2" style="width:16px;"></i> Converter</a>
-            <a href="simulator.html"><i data-lucide="play" style="width:16px;"></i> Simulator</a>
-        </nav>
-
         <header>
             <div class="badge">Open-Source Engine</div>
             <h1>SOP-to-Skill Compiler</h1>
             <p>將繁複的「標準作業程序（SOP）」文檔，編譯為可被 Agent 載入的合法 Skill 目錄。</p>
         </header>
+
+        <nav class="stepper">
+            <button type="button" class="step active" data-goto="1" onclick="showStep(1)">
+                <span class="step-num">1</span><span class="step-text"><b>編譯</b><span class="step-sub">貼上 SOP → 合法 Skill</span></span>
+            </button>
+            <span class="step-line"></span>
+            <button type="button" class="step" data-goto="2" onclick="showStep(2)">
+                <span class="step-num">2</span><span class="step-text"><b>看懂</b><span class="step-sub">視覺化流程 + 核准閘</span></span>
+            </button>
+            <span class="step-line"></span>
+            <a class="step" href="simulator.html">
+                <span class="step-num">3</span><span class="step-text"><b>證明</b><span class="step-sub">模擬 Agent 執行</span></span>
+            </a>
+        </nav>
+
+        <div class="step-panel" data-step="1">
         <!-- Core Concept Section (collapsed: marketing, not the task) -->
         <details class="glass-card">
             <summary class="artifacts-summary"><i data-lucide="lightbulb"></i> 設計思維：為什麼要把 SOP 轉成 Skill？</summary>
@@ -197,6 +208,13 @@
                 <div id="quality-report-content" class="code-display"></div>
             </div>
         </details>
+
+        <div class="step-cta">
+            <button type="button" class="btn-cta" onclick="showStep(2)">下一步：看懂流程 <i data-lucide="arrow-right" style="width:18px;"></i></button>
+        </div>
+        </div><!-- /step-panel 1 -->
+
+        <div class="step-panel" data-step="2" style="display:none;">
         <!-- Interactive Flowchart Visualizer (the hero artifact) -->
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化</h2>
@@ -222,10 +240,12 @@
 
         </section>
         <section class="glass-card">
-            <div class="page-cta">
-                <button class="btn-cta" onclick="goToSimulator()"><i data-lucide="play"></i> 前往執行模擬器 (Simulator) &rarr;</button>
+            <div class="page-cta" style="gap:12px;">
+                <button type="button" class="intg-btn secondary" onclick="showStep(1)"><i data-lucide="arrow-left" style="width:16px;"></i> 上一步：回到編譯</button>
+                <button class="btn-cta" onclick="goToSimulator()"><i data-lucide="play"></i> 下一步：前往執行模擬器 &rarr;</button>
             </div>
         </section>
+        </div><!-- /step-panel 2 -->
 
 <script type="text/markdown" id="sample-api-mcp"># SOP: 機台異常自動通報與工單程序
 

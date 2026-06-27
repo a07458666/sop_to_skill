@@ -2045,12 +2045,25 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 if (status) status.textContent = '無法解析 flow.json：' + e.message;
             }
         }
+        // Three-step journey on the Converter: ① 編譯 / ② 看懂. Step ③ (證明) lives on the
+        // Simulator page. The flow SVG self-sizes from the graph, so rendering it inside a
+        // hidden panel is fine — no re-render needed on switch.
+        function showStep(n) {
+            document.querySelectorAll('.step-panel').forEach(panel => {
+                panel.style.display = String(panel.dataset.step) === String(n) ? '' : 'none';
+            });
+            document.querySelectorAll('.stepper .step[data-goto]').forEach(step => {
+                step.classList.toggle('active', String(step.dataset.goto) === String(n));
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         function initConverter() {
             rebuildGeneratedFilesFromCurrentMarkdown();
             renderRuleAndReportBlocks();
             renderMarkdownPreview();
             renderFlowFromGeneratedJson();
             persistState();
+            showStep(window.location.hash === '#review' ? 2 : 1);
         }
         function initSimulator() {
             const saved = loadState();

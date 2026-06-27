@@ -68,8 +68,11 @@ Output Skill bundle per SOP:
   (both pages link them; no build step). `app.js` re-implements the compiler in JS
   (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`) to stay at **parity
   with `parser.py`** (enforced by `tests/test_parity.py`, which reads `assets/app.js`).
-  - **Converter**: SOP markdown editor → compile → SKILL.md/flow.json/quality report + flow
-    visualizer + 「前往模擬器」(`goToSimulator` persists state to `localStorage`).
+  - **Converter**: a two-step journey driven by a top stepper (`showStep`) — ① 編譯 (editor →
+    compile → SKILL.md/flow.json + a collapsed quality report card with a pass/fail badge) and
+    ② 看懂 (the flow visualizer, the hero). Marketing/概念 and the `sop_rule.md` authoring editor
+    are collapsed into `<details>`. 「前往模擬器」(`goToSimulator`) persists state and hands off
+    to step ③; `index.html#review` deep-links straight to step ②.
   - **Simulator**: loads the compiled flow from `localStorage` (or a pasted `flow.json` via
     `loadPastedFlow`) → integration config editor + MCP mount panel + execution simulator.
   - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`
