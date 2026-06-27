@@ -13,9 +13,18 @@
 <body data-page="simulator">
 
     <div class="container">
-        <nav class="topnav">
-            <a href="index.html"><i data-lucide="wand-2" style="width:16px;"></i> Converter</a>
-            <a href="simulator.html" class="active"><i data-lucide="play" style="width:16px;"></i> Simulator</a>
+        <nav class="stepper">
+            <a class="step done" href="index.html">
+                <span class="step-num">1</span><span class="step-text"><b>編譯</b><span class="step-sub">貼上 SOP → 合法 Skill</span></span>
+            </a>
+            <span class="step-line"></span>
+            <a class="step done" href="index.html#review">
+                <span class="step-num">2</span><span class="step-text"><b>看懂</b><span class="step-sub">視覺化流程 + 核准閘</span></span>
+            </a>
+            <span class="step-line"></span>
+            <span class="step active">
+                <span class="step-num">3</span><span class="step-text"><b>證明</b><span class="step-sub">模擬 Agent 執行</span></span>
+            </span>
         </nav>
 
         <header>
@@ -52,8 +61,8 @@
 
         <!-- Interactive Flowchart Visualizer -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化 (Interactive Flow Visualizer)</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點擊下方任一狀態節點，可以即時動態追蹤該節點被 AI 載入時的「關聯工具 API / MCP、調用參數、回傳判讀」與「條件路由跳轉邏輯」。</p>
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點任一節點，查看它呼叫的工具、回傳判讀與路由。</p>
 
             <div class="flow-legend">
                 <span><span class="swatch" style="background: var(--secondary);"></span> API action（REST 查詢）</span>
@@ -74,10 +83,10 @@
             </div>
 
         </section>
-        <!-- API / MCP Integration Configuration -->
+        <!-- API / MCP Integration Configuration + Mount (one flow: ①設定 ②掛載) -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="settings-2"></i> API / MCP 整合設定 (Integration Configuration)</h2>
-            <p class="intg-hint">編譯後會依 <code>flow.json</code> 的工具、參數、<code>Returns</code>、<code>Signal</code> 自動帶入下方設定。你可以<strong>編輯要使用的 MCP server 與其工具、設定要測試的 API、以及每個工具的輸入/輸出（I/O）欄位與判讀 Signal</strong>。按「套用設定」後，下方的掛載面板、節點檢視器與執行模擬器都會依此設定顯示 skill 實際如何調用 API / MCP 並判讀回傳。</p>
+            <h2 class="section-title"><i data-lucide="settings-2"></i> 整合與掛載 · ① 設定工具 I/O</h2>
+            <p class="intg-hint">依 <code>flow.json</code> 自動帶入工具 / 參數 / Returns / Signal；可編輯後按「套用設定」。</p>
             <div class="intg-toolbar">
                 <button class="intg-btn" onclick="applyIntegration()"><i data-lucide="check-check" style="width:15px;"></i> 套用設定（讀取工具 / 輸出）</button>
                 <button class="intg-btn secondary" onclick="addMcpServer()"><i data-lucide="server" style="width:15px;"></i> 新增 MCP server</button>
@@ -88,14 +97,14 @@
         </section>
         <!-- MCP / API Runtime Mounting & Validation -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="plug"></i> MCP Server 掛載與工具驗證 (Runtime Mount &amp; Validation)</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">編譯時會驗證每個 <code>API</code> / <code>MCP</code> 工具的「參數契約」與「回傳判讀規則」（詳見上方 SOP 品質報告）。<code>MCP</code> 工具需先掛載對應 server，下方執行模擬器才能成功呼叫；<code>API</code> 工具則以 REST endpoint 直接呼叫。</p>
+            <h2 class="section-title"><i data-lucide="plug"></i> 整合與掛載 · ② 掛載 MCP server</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;"><code>MCP</code> 工具需先掛載對應 server,模擬器才能呼叫;<code>API</code> 直接以 REST 呼叫。</p>
             <div class="mcp-grid" id="mcp-mount-panel"></div>
         </section>
         <!-- Skill Execution Simulator -->
         <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器 (API / MCP Call Simulation)</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 <code>flow.json</code> 的 start state 開始。每個工具 state 會模擬實際的 <code>API</code> / <code>MCP</code> 呼叫與回傳，並示範 Agent 如何<strong>判讀回傳值</strong>以決定下一步路由。</p>
+            <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">從 start state 開始,模擬每步的 API / MCP 呼叫與回傳,示範 Agent 如何<strong>判讀回傳值路由</strong>、被擋下非法步驟、卡在核准閘。</p>
             <div class="simulator-layout">
                 <div class="sim-state-card" id="simulator-current-state"></div>
                 <div class="sim-history" id="simulator-history"></div>

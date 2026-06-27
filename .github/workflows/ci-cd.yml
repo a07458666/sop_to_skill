@@ -35,7 +35,7 @@ jobs:
         run: pip install ruff
 
       - name: Lint Python (ruff)
-        run: ruff check parser.py executor.py optimizer.py evolve.py mcp_server.py eval/ tests/
+        run: ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

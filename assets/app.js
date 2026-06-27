@@ -615,8 +615,24 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         }
 
         function renderRuleAndReportBlocks() {
-            document.getElementById('sop-rule-content').value = generatedFiles['sop-rule-md'];
-            document.getElementById('quality-report-content').textContent = generatedFiles['quality-report-md'];
+            const rule = document.getElementById('sop-rule-content');
+            const report = document.getElementById('quality-report-content');
+            if (rule) rule.value = generatedFiles['sop-rule-md'];
+            if (report) report.textContent = generatedFiles['quality-report-md'];
+            updateQualityBadge();
+        }
+
+        // Surface the quality verdict as a compact badge in the (collapsed) report summary,
+        // so the user sees pass/fail without expanding a wall of markdown.
+        function updateQualityBadge() {
+            const badge = document.getElementById('quality-status-badge');
+            if (!badge) return;
+            const passed = /\*\*狀態\*\*:\s*`通過`/.test(generatedFiles['quality-report-md'] || '');
+            badge.textContent = passed ? '✅ 通過' : '⚠️ 需修訂';
+            badge.className = 'status-badge ' + (passed ? 'ok' : 'warn');
+            // Auto-expand the (otherwise collapsed) report when there are problems to fix.
+            const card = document.getElementById('quality-report-card');
+            if (card && !passed) card.open = true;
         }
 
         function syncRuleContentFromEditor() {
@@ -2029,12 +2045,25 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 if (status) status.textContent = '無法解析 flow.json：' + e.message;
             }
         }
+        // Three-step journey on the Converter: ① 編譯 / ② 看懂. Step ③ (證明) lives on the
+        // Simulator page. The flow SVG self-sizes from the graph, so rendering it inside a
+        // hidden panel is fine — no re-render needed on switch.
+        function showStep(n) {
+            document.querySelectorAll('.step-panel').forEach(panel => {
+                panel.style.display = String(panel.dataset.step) === String(n) ? '' : 'none';
+            });
+            document.querySelectorAll('.stepper .step[data-goto]').forEach(step => {
+                step.classList.toggle('active', String(step.dataset.goto) === String(n));
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         function initConverter() {
             rebuildGeneratedFilesFromCurrentMarkdown();
             renderRuleAndReportBlocks();
             renderMarkdownPreview();
             renderFlowFromGeneratedJson();
             persistState();
+            showStep(window.location.hash === '#review' ? 2 : 1);
         }
         function initSimulator() {
             const saved = loadState();
