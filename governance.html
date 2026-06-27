@@ -55,6 +55,22 @@
             </div>
         </section>
 
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 新版流程圖（差異標示）</h2>
+            <div class="flow-legend">
+                <span><span class="swatch" style="background: var(--green);"></span> 新增 state</span>
+                <span><span class="swatch" style="background: var(--amber);"></span> 變更 state（欄位 / 分支）</span>
+                <span style="color: var(--text-muted);">移除的 state 只出現在上方文字報告</span>
+            </div>
+            <div class="flow-container" id="flow-container"></div>
+            <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-placeholder">
+                    <i data-lucide="info"></i>
+                    <span>比較後點任一節點，查看該 state 的工具 / 判讀 / 路由細節。</span>
+                </div>
+            </div>
+        </section>
+
         <footer>
             <p>SOP-to-Skill Compiler Concept Guide &copy; 2026. Powered by Google Gemini.</p>
         </footer>

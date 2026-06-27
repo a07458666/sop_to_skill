@@ -925,6 +925,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         function renderFlowFromGeneratedJson() {
             const flow = parseGeneratedFlow();
             const container = document.getElementById('flow-container');
+            if (!container) return;
             container.innerHTML = '';
 
             const svgNs = 'http://www.w3.org/2000/svg';
@@ -2205,14 +2206,30 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 const newFlow = JSON.parse(newBox.value.trim());
                 const diff = diffFlows(oldFlow, newFlow);
                 out.textContent = renderFlowDiffMarkdown(diff, oldFlow.sop_name || '舊版', newFlow.sop_name || '新版');
+                // Overlay the diff on the NEW flow's graph: added = green, changed = amber.
+                generatedFiles['flow-json'] = JSON.stringify(newFlow, null, 2);
+                renderFlowFromGeneratedJson();
+                decorateFlowDiff(diff);
                 if (status) {
                     status.textContent = hasFlowChanges(diff)
-                        ? '兩版狀態機有差異（見下方報告）。'
+                        ? '兩版狀態機有差異（下方為差異報告與新版流程圖，綠＝新增、琥珀＝變更）。'
                         : '兩版狀態機完全相同。';
                 }
             } catch (e) {
                 if (status) status.textContent = '無法解析 flow.json：' + e.message;
             }
+        }
+
+        // Tint the new flow's nodes by diff status (removed states only appear in the report).
+        function decorateFlowDiff(diff) {
+            const container = document.getElementById('flow-container');
+            if (!container) return;
+            const mark = (id, cls) => {
+                const g = container.querySelector('.flow-svg-node[data-node-id="' + id + '"]');
+                if (g) g.classList.add(cls);
+            };
+            diff.states_added.forEach(id => mark(id, 'diff-added'));
+            Object.keys(diff.states_changed).forEach(id => mark(id, 'diff-changed'));
         }
 
         function initGovernance() {
