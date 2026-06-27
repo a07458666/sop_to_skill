@@ -78,7 +78,11 @@ Output Skill bundle per SOP:
   - **Governance** (`governance.html`, `data-page="governance"`): the 進階 · 治理 entry — paste
     two `flow.json` versions (old defaults from `localStorage`) and render a graph-level diff via
     a **JS port of `flowdiff.py`** (the `// ==== flowdiff` block in `app.js`, kept in parity by
-    `tests/test_flowdiff_parity.py`). Reached via the `.gov-entry` link under the stepper.
+    `tests/test_flowdiff_parity.py`). It also overlays the diff on the new flow graph
+    (added=green / changed=amber) and renders **evolve suggestions** (`renderEvolveSuggestions`)
+    — the diff translated into reviewable SOP-markdown edits (the web half of `evolve.py`'s
+    close-the-loop; the auto-proposal loop itself stays in Python). Reached via the `.gov-entry`
+    link under the stepper.
   - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`,
     `initSimulator()`, or `initGovernance()`. Cross-page handoff via `STORAGE_KEY`
     (`persistState`/`loadState`).

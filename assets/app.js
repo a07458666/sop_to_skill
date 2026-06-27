@@ -2185,6 +2185,33 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         }
         // ==== end flowdiff ====
 
+        // Evolve (closing-the-loop, web surface): translate a graph-level diff into a
+        // reviewable list of SOP-markdown edits. The full auto-proposal loop (gap
+        // detection → bounded edits → held-out gate) runs in evolve.py / optimizer.py
+        // (needs rollouts); here we render the "edits back to the human-owned SOP" half.
+        function renderEvolveSuggestions(diff) {
+            if (!hasFlowChanges(diff)) return '兩版相同，SOP 不需修訂。\n';
+            const lines = ['# 演化建議：把差異寫回 SOP\n'];
+            lines.push('SOP 是單一事實來源。以下把上方圖層級差異，反映回人類可讀 SOP 的修訂建議；審核後更新 .md 並重新編譯即生效。\n');
+            diff.states_added.forEach(id => lines.push('- ➕ 新增步驟 `' + id + '`：在 SOP 增加對應的 `### Step` / `### State` 段落。'));
+            diff.states_removed.forEach(id => lines.push('- ➖ 移除步驟 `' + id + '`：刪除其段落，並改接其上游分支。'));
+            Object.entries(diff.states_changed).forEach(([id, rec]) => {
+                const f = rec.fields || {};
+                if (f.signal_field) lines.push('- 🔧 `' + id + '`：把 **Signal** 改為 `' + f.signal_field.new + '`。');
+                if (f.returns) lines.push('- 🔧 `' + id + '`：更新 **Returns** 為 ' + ((f.returns.new || []).map(x => '`' + x + '`').join(', ') || '（無）') + '。');
+                if (f.parameters) lines.push('- 🔧 `' + id + '`：更新工具參數為 ' + ((f.parameters.new || []).map(x => '`' + x + '`').join(', ') || '（無）') + '。');
+                if (f.requires_approval) {
+                    lines.push(f.requires_approval.new === true
+                        ? '- 🔒 `' + id + '`：加上核准閘（在該步驟加一行 `**Approval**: required`）。'
+                        : '- 🔓 `' + id + '`：移除核准閘（`**Approval**: no`）。');
+                }
+                Object.entries(rec.transitions_added || {}).forEach(([o, t]) => lines.push('- ➕ `' + id + '` 新增分支：outcome 「' + o + '」→ `' + t + '`（在該步驟 Branching 下加一條 If 規則）。'));
+                Object.entries(rec.transitions_retargeted || {}).forEach(([o, c]) => lines.push('- 🔀 `' + id + '` 分支「' + o + '」：改指向 `' + c.new + '`（原 `' + c.old + '`）。'));
+                Object.entries(rec.transitions_removed || {}).forEach(([o, t]) => lines.push('- ➖ `' + id + '` 移除分支「' + o + '」（原指向 `' + t + '`）。'));
+            });
+            return lines.join('\n') + '\n';
+        }
+
         function loadCurrentFlowIntoDiff() {
             const box = document.getElementById('diff-old');
             const saved = loadState();
@@ -2209,6 +2236,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
                 generatedFiles['flow-json'] = JSON.stringify(newFlow, null, 2);
                 renderFlowFromGeneratedJson();
                 decorateFlowDiff(diff);
+                const evolveOut = document.getElementById('evolve-output');
+                if (evolveOut) evolveOut.textContent = renderEvolveSuggestions(diff);
                 if (status) {
                     status.textContent = hasFlowChanges(diff)
                         ? '兩版狀態機有差異（下方為差異報告與新版流程圖，綠＝新增、琥珀＝變更）。'
