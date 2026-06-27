@@ -929,7 +929,7 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             container.innerHTML = '';
 
             const svgNs = 'http://www.w3.org/2000/svg';
-            const dims = { nodeWidth: 246, nodeHeight: 116, gapX: 60, gapY: 90, marginX: 48, marginY: 40 };
+            const dims = { nodeWidth: 240, nodeHeight: 84, gapX: 56, gapY: 76, marginX: 44, marginY: 36 };
             const { nodeWidth, nodeHeight } = dims;
             const { positions, backEdges, width, height } = computeFlowLayout(flow, dims);
 
@@ -1067,12 +1067,11 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
                 group.innerHTML = `
                     <rect width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
-                    <rect width="5" height="${nodeHeight}" rx="2" fill="${typeColor}" opacity="0.9"></rect>
-                    <text class="flow-node-type" x="20" y="25" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
+                    <rect width="4" height="${nodeHeight}" rx="2" fill="${typeColor}" opacity="0.8"></rect>
+                    <text class="flow-node-type" x="18" y="24" fill="${typeColor}">${state.type === 'end_state' ? 'END' : state.type.toUpperCase()}</text>
                     ${kindBadge}
-                    <text class="flow-node-title" x="20" y="54">${escapeHtml(title)}</text>
-                    <text class="flow-node-tool" x="20" y="80">${escapeHtml(truncate(transportText, 32))}</text>
-                    ${returnsText ? `<text class="flow-node-returns" x="20" y="100">${escapeHtml(truncate(returnsText, 34))}</text>` : ''}
+                    <text class="flow-node-title" x="18" y="50">${escapeHtml(title)}</text>
+                    <text class="flow-node-tool" x="18" y="70">${escapeHtml(truncate(transportText, 34))}</text>
                 `;
                 group.addEventListener('click', () => inspectNode(state.id, group));
                 svg.appendChild(group);
