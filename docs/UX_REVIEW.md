@@ -73,7 +73,7 @@
 
 1. ✅ **去雜訊 pass**:漸進揭露(概念/規則收摺疊)、品質報告徽章化、文案精簡、整合+掛載合併為兩步。
 2. ✅ **三步旅程**:頂部 ① 編譯 → ② 看懂 → ③ 證明 進度條(`showStep`);Converter 承載 ①②(步驟面板切換),Simulator 為 ③;`index.html#review` 深連結步驟 ②。
-3. **治理進階區(待做)**:把 `flowdiff` / `evolve` 收進獨立的「治理」入口。
+3. ✅ **治理進階區**:`governance.html`(進階 · 治理)用 `flowdiff` 的 JS port 比較兩版 flow.json;入口在 stepper 下方。後續:把 `evolve` 提案也納入此入口。
 
 ## 7. 成功指標
 

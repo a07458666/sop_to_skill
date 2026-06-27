@@ -75,8 +75,13 @@ Output Skill bundle per SOP:
     to step ③; `index.html#review` deep-links straight to step ②.
   - **Simulator**: loads the compiled flow from `localStorage` (or a pasted `flow.json` via
     `loadPastedFlow`) → integration config editor + MCP mount panel + execution simulator.
-  - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`
-    or `initSimulator()`. Cross-page handoff via `STORAGE_KEY` (`persistState`/`loadState`).
+  - **Governance** (`governance.html`, `data-page="governance"`): the 進階 · 治理 entry — paste
+    two `flow.json` versions (old defaults from `localStorage`) and render a graph-level diff via
+    a **JS port of `flowdiff.py`** (the `// ==== flowdiff` block in `app.js`, kept in parity by
+    `tests/test_flowdiff_parity.py`). Reached via the `.gov-entry` link under the stepper.
+  - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`,
+    `initSimulator()`, or `initGovernance()`. Cross-page handoff via `STORAGE_KEY`
+    (`persistState`/`loadState`).
 - `docs/PRODUCT.md` — product positioning (four-pillar loop: Compile/Enforce/Prove/Evolve,
   SOP-as-Code, north-star metrics). `docs/ROADMAP.md` — schedule + acceptance criteria;
   phase 1 (M0–M2.5) done, phase 2 is G1–G4 (G1 = executor as a real MCP server, first).
@@ -85,7 +90,7 @@ Output Skill bundle per SOP:
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
 - `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
-  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html` + `node --check assets/app.js`),
+  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html governance.html` + `node --check assets/app.js`),
   test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
   GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
@@ -176,7 +181,7 @@ Surfaced in the node inspector, simulator, and quality report.
 ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/
 python3 -m pytest tests/ -q
 python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
-html-validate index.html simulator.html
+html-validate index.html simulator.html governance.html
 node --check assets/app.js   # shared web-demo JS
 # Regenerate committed skills (offline fallback; no GEMINI_API_KEY needed):
 python3 parser.py --input sample_sop.md --output-dir skills/tool_fault_investigation --rules sop_rule.md
