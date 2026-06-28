@@ -89,7 +89,7 @@ class MCPServer:
         if not isinstance(outcome, str):
             return {"error": "'outcome' (string) is required."}, True
         try:
-            self.executor.step(outcome)
+            self.executor.step(outcome, actor=args.get("actor"))
         except UnknownOutcomeError as exc:
             # surface the executor's guidance so the agent can self-correct
             return {
@@ -114,7 +114,7 @@ class MCPServer:
             return miss, True
         if not self.executor.requires_approval():
             return {"error": f"state '{self.executor.current_id}' is not an approval gate."}, True
-        self.executor.approve(args.get("note") or "approved via MCP")
+        self.executor.approve(args.get("note") or "approved via MCP", actor=args.get("actor"))
         return {
             "approved_state": self.executor.current_id,
             "available_actions": self.executor.available_actions(),
@@ -128,7 +128,7 @@ class MCPServer:
         if not isinstance(tool, str):
             return {"error": "'tool' (string) is required."}, True
         try:
-            call = self.executor.call_tool(tool, args.get("parameters") or {})
+            call = self.executor.call_tool(tool, args.get("parameters") or {}, actor=args.get("actor"))
         except ExecutorError as exc:
             return {"error": str(exc), "allowed_tool": self.executor.current.tool}, True
         return {"validated_call": call}, False
@@ -142,6 +142,7 @@ class MCPServer:
             "final_state": self.executor.current_id,
             "is_terminal": self.executor.is_terminal,
             "visited_states": self.executor.visited_states(),
+            "audit": self.executor.verify_audit(),
             "trail": self.executor.audit_trail(),
         }, False
 
@@ -176,7 +177,10 @@ class MCPServer:
             "list of legal outcomes. Advances the state machine on success.",
             "inputSchema": {
                 "type": "object",
-                "properties": {"outcome": {"type": "string"}},
+                "properties": {
+                    "outcome": {"type": "string"},
+                    "actor": {"type": "string", "description": "Who is acting (audit attribution)."},
+                },
                 "required": ["outcome"],
             },
             "handler": "t_sop_report_outcome",
@@ -187,7 +191,10 @@ class MCPServer:
             "past it. Optional 'note' is recorded in the audit trail.",
             "inputSchema": {
                 "type": "object",
-                "properties": {"note": {"type": "string"}},
+                "properties": {
+                    "note": {"type": "string"},
+                    "actor": {"type": "string", "description": "Who approved (audit attribution)."},
+                },
             },
             "handler": "t_sop_request_approval",
         },
@@ -200,6 +207,7 @@ class MCPServer:
                 "properties": {
                     "tool": {"type": "string"},
                     "parameters": {"type": "object"},
+                    "actor": {"type": "string", "description": "Who is calling (audit attribution)."},
                 },
                 "required": ["tool"],
             },

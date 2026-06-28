@@ -22,12 +22,16 @@ Output Skill bundle per SOP:
   Gemini path (`GEMINI_API_KEY`) and an **offline heuristic fallback** parser
   (`offline_fallback_parse`) used when no key is set. Emits the Skill bundle.
   `assess_sop_quality()` builds the quality report including the API/MCP validation table.
-- `executor.py` — the **runtime enforcement layer** (M1). `SkillExecutor` loads a
-  `flow.json` (reusing the parser's schema) and enforces it as an execution contract:
-  legal-only tool calls + outcomes, human-in-the-loop **approval gates** (explicit
-  `state.requires_approval` wins; null falls back to `DEFAULT_APPROVAL_KEYWORDS`, e.g.
-  hold/escalate/release), and a serializable audit trail.
-  CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`.
+- `executor.py` — the **runtime enforcement layer** (M1) + **governance audit** (G4).
+  `SkillExecutor` loads a `flow.json` (reusing the parser's schema) and enforces it as an
+  execution contract: legal-only tool calls + outcomes, human-in-the-loop **approval gates**
+  (explicit `state.requires_approval` wins; null falls back to `DEFAULT_APPROVAL_KEYWORDS`, e.g.
+  hold/escalate/release). G4 audit: every action (`tool_call` / `approval` / `transition`) is
+  recorded with **actor attribution** (`actor` param on the executor + per-call override — e.g.
+  the human who signed off a gate) and a **tamper-evident hash chain** (`prev_hash`/`entry_hash`,
+  sha256; `verify_audit()` recomputes it). Exportable as JSON or CSV (`to_json`/`to_csv`).
+  CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`, `--actor`,
+  `--export PATH` (`.csv` → CSV else JSON).
 - `optimizer.py` — **structured self-evolution** of a flow (M2.5), the structured analogue
   of SkillOpt. Proposes **bounded graph edits** (`Edit`: add_transition / set_signal_field),
   accepts one **only when it strictly improves a held-out validation score** (`score_flow`
@@ -52,7 +56,9 @@ Output Skill bundle per SOP:
   MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
   `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,
   `sop_report_outcome` (rejects undefined outcomes, returns legal ones), `sop_request_approval`,
-  `sop_call_tool` (gate-checks tool calls), `sop_audit_trail`. `handle()` is pure/unit-tested;
+  `sop_call_tool` (gate-checks tool calls), `sop_audit_trail`. The mutating tools accept an
+  optional `actor` (audit attribution) and `sop_audit_trail` returns the hash-chain verdict.
+  `handle()` is pure/unit-tested;
   `serve_stdio()` is the I/O loop a real agent client spawns. Run: `python mcp_server.py --flow ...`.
 - `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
   `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
