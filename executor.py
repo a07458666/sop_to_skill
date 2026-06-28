@@ -20,7 +20,10 @@ this module and the compiler never drift apart.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as _dt
+import hashlib
+import io
 import json
 import sys
 from typing import Dict, List, Optional
@@ -74,10 +77,16 @@ class SkillExecutor:
         machine: StateMachine,
         approval_states: Optional[List[str]] = None,
         approval_keywords: Optional[List[str]] = None,
+        actor: str = "agent",
     ):
         self.machine = machine
         self._states: Dict[str, State] = {s.id: s for s in machine.states}
         self._validate_flow()
+
+        # Default attribution for audit entries (who is driving execution). Any
+        # approve()/step()/call_tool() call can override it per-action — this is how
+        # an approval gate records the human who signed off vs the agent that ran.
+        self.actor = actor
 
         self._approval_keywords = tuple(
             k.lower() for k in (approval_keywords or DEFAULT_APPROVAL_KEYWORDS)
@@ -166,8 +175,42 @@ class SkillExecutor:
             "is_terminal": self.is_terminal,
         }
 
+    # ---- audit recording -----------------------------------------------------
+    def _record(self, entry: dict, actor: Optional[str]) -> dict:
+        """Append an audit entry, stamping seq/actor/ts and a tamper-evident hash.
+
+        Each entry carries ``prev_hash`` (the previous entry's ``entry_hash``, or
+        "" for the first) and its own ``entry_hash`` = sha256 over the entry's
+        canonical JSON. ``verify_audit()`` recomputes the chain so any post-hoc
+        edit to a recorded step is detectable.
+        """
+        entry = dict(entry)
+        entry["seq"] = len(self.history)
+        entry["actor"] = actor or self.actor
+        entry["ts"] = _now()
+        entry["prev_hash"] = self.history[-1]["entry_hash"] if self.history else ""
+        entry["entry_hash"] = _hash_entry(entry)
+        self.history.append(entry)
+        return entry
+
+    def verify_audit(self) -> dict:
+        """Recompute the hash chain; report the first tampered entry, if any."""
+        prev = ""
+        for i, entry in enumerate(self.history):
+            if entry.get("prev_hash", "") != prev:
+                return {"ok": False, "broken_seq": i, "reason": "prev_hash mismatch"}
+            if entry.get("entry_hash") != _hash_entry(entry):
+                return {"ok": False, "broken_seq": i, "reason": "entry_hash mismatch"}
+            prev = entry["entry_hash"]
+        return {"ok": True, "broken_seq": None, "entries": len(self.history)}
+
     # ---- enforcement ---------------------------------------------------------
-    def call_tool(self, tool_name: str, parameters: Optional[dict] = None) -> dict:
+    def call_tool(
+        self,
+        tool_name: str,
+        parameters: Optional[dict] = None,
+        actor: Optional[str] = None,
+    ) -> dict:
         """Validate a tool call against the current state.
 
         Raises ``IllegalToolCallError`` when the agent tries to call any tool
@@ -190,6 +233,17 @@ class SkillExecutor:
                 f"state '{self.current_id}' allows tool '{expected}', "
                 f"not '{tool_name}'."
             )
+        self._record(
+            {
+                "event": "tool_call",
+                "state": self.current_id,
+                "tool": expected,
+                "tool_kind": self.current.tool_kind,
+                "mcp_server": self.current.mcp_server,
+                "parameters": parameters or {},
+            },
+            actor,
+        )
         return {
             "tool": expected,
             "tool_kind": self.current.tool_kind,
@@ -197,19 +251,21 @@ class SkillExecutor:
             "parameters": parameters or {},
         }
 
-    def approve(self, note: Optional[str] = None) -> None:
-        """Approve the current state so execution may advance past the gate."""
+    def approve(self, note: Optional[str] = None, actor: Optional[str] = None) -> None:
+        """Approve the current state so execution may advance past the gate.
+
+        Always recorded (with the approving ``actor``) — who signed off on a gate
+        is the central fact of a governance audit, so it is never silently dropped.
+        """
         self._approved.add(self.current_id)
-        if note:
-            self.history.append(
-                {
-                    "seq": len(self.history),
-                    "event": "approval",
-                    "state": self.current_id,
-                    "note": note,
-                    "ts": _now(),
-                }
-            )
+        self._record(
+            {
+                "event": "approval",
+                "state": self.current_id,
+                "note": note,
+            },
+            actor,
+        )
 
     def step(
         self,
@@ -217,6 +273,7 @@ class SkillExecutor:
         *,
         tool_result: Optional[dict] = None,
         approval: Optional[str] = None,
+        actor: Optional[str] = None,
     ) -> State:
         """Advance via ``outcome``, enforcing the graph and approval gates."""
         if self.is_terminal:
@@ -225,7 +282,7 @@ class SkillExecutor:
             )
 
         if approval is not None:
-            self.approve(approval)
+            self.approve(approval, actor=actor)
 
         if self.requires_approval() and not self.is_approved():
             raise ApprovalRequiredError(
@@ -242,9 +299,8 @@ class SkillExecutor:
 
         from_id = self.current_id
         target = transitions[outcome]
-        self.history.append(
+        self._record(
             {
-                "seq": len(self.history),
                 "event": "transition",
                 "from": from_id,
                 "tool": self.current.tool,
@@ -253,8 +309,8 @@ class SkillExecutor:
                 "to": target,
                 "approved": from_id in self._approved,
                 "tool_result": tool_result,
-                "ts": _now(),
-            }
+            },
+            actor,
         )
         self.current_id = target
         return self.current
@@ -277,12 +333,46 @@ class SkillExecutor:
                 "start_state": self.machine.start_state,
                 "final_state": self.current_id,
                 "is_terminal": self.is_terminal,
+                "actor": self.actor,
                 "approval_gates": sorted(self._approval_states),
+                "audit": self.verify_audit(),
                 "trail": self.history,
             },
             ensure_ascii=False,
             indent=indent,
         )
+
+    _CSV_FIELDS = (
+        "seq",
+        "ts",
+        "event",
+        "actor",
+        "state",
+        "from",
+        "to",
+        "outcome",
+        "tool",
+        "tool_kind",
+        "approved",
+        "note",
+        "entry_hash",
+    )
+
+    def to_csv(self) -> str:
+        """Flatten the audit trail to CSV (one row per recorded action)."""
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=self._CSV_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for entry in self.history:
+            writer.writerow({k: entry.get(k, "") for k in self._CSV_FIELDS})
+        return buf.getvalue()
+
+
+def _hash_entry(entry: dict) -> str:
+    """sha256 over an entry's canonical JSON, excluding its own ``entry_hash``."""
+    payload = {k: v for k, v in entry.items() if k != "entry_hash"}
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
 def _now() -> str:
@@ -291,7 +381,7 @@ def _now() -> str:
 
 # ---- CLI demo ---------------------------------------------------------------
 def _run_cli(args: argparse.Namespace) -> int:
-    ex = SkillExecutor.from_flow_file(args.flow)
+    ex = SkillExecutor.from_flow_file(args.flow, actor=args.actor)
     print(f"SOP: {ex.machine.sop_name}")
     print(f"Start: {ex.current_id}   Approval gates: {sorted(ex._approval_states)}\n")
 
@@ -340,6 +430,16 @@ def _run_cli(args: argparse.Namespace) -> int:
         print(f"  {ex.current.description}\n")
     if args.audit:
         print(ex.to_json())
+    if args.export:
+        if args.export.lower().endswith(".csv"):
+            payload = ex.to_csv()
+        else:
+            payload = ex.to_json()
+        with open(args.export, "w", encoding="utf-8", newline="") as f:
+            f.write(payload)
+        verdict = ex.verify_audit()
+        seal = "verified" if verdict["ok"] else f"TAMPERED@{verdict['broken_seq']}"
+        print(f"\nAudit trail exported to {args.export}  (hash chain: {seal})")
     return 0
 
 
@@ -354,6 +454,13 @@ def main() -> int:
     )
     p.add_argument("--auto-approve", action="store_true", help="Auto-approve approval gates.")
     p.add_argument("--audit", action="store_true", help="Print the JSON audit trail at the end.")
+    p.add_argument("--actor", default="agent", help="Default actor attributed to audit entries.")
+    p.add_argument(
+        "--export",
+        default=None,
+        metavar="PATH",
+        help="Write the audit trail to PATH (.csv → CSV, otherwise JSON).",
+    )
     return _run_cli(p.parse_args())
 
 

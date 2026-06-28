@@ -184,3 +184,60 @@ def test_explicit_requires_approval_false_overrides_keyword():
             state["requires_approval"] = False
     ex = SkillExecutor(StateMachine(**data))
     assert "place_tool_on_hold" not in ex._approval_states
+
+
+# ---- G4 governance: actor attribution, tamper-evidence, export --------------
+def test_actor_attribution_default_and_override():
+    ex = make_executor(actor="agent.bot")
+    ex.step("fault event is confirmed")  # default actor
+    # the hold gate is approved by a named human, then stepped past
+    ex.approve("signed off", actor="engineer.lin")
+    ex.step("hold is applied successfully", actor="agent.bot")
+    trail = ex.audit_trail()
+    transition0 = trail[0]
+    approval = next(e for e in trail if e["event"] == "approval")
+    assert transition0["actor"] == "agent.bot"
+    assert approval["actor"] == "engineer.lin"
+    assert approval["note"] == "signed off"
+
+
+def test_tool_call_is_recorded_with_actor():
+    ex = make_executor(approval_states=[])
+    ex.call_tool("mes_event_lookup", {"tool_id": "T1"}, actor="agent.bot")
+    entry = ex.audit_trail()[0]
+    assert entry["event"] == "tool_call"
+    assert entry["tool"] == "mes_event_lookup"
+    assert entry["parameters"] == {"tool_id": "T1"}
+    assert entry["actor"] == "agent.bot"
+
+
+def test_audit_hash_chain_verifies_and_detects_tampering():
+    ex = make_executor(approval_states=[])
+    ex.step("fault event is confirmed")
+    ex.step("hold is applied successfully")
+    assert ex.verify_audit() == {"ok": True, "broken_seq": None, "entries": 2}
+    # every entry chains to the previous one's hash
+    assert ex.history[1]["prev_hash"] == ex.history[0]["entry_hash"]
+    # tamper with a recorded outcome -> chain no longer verifies
+    ex.history[0]["to"] = "open_mrb_case"
+    verdict = ex.verify_audit()
+    assert verdict["ok"] is False
+    assert verdict["broken_seq"] == 0
+
+
+def test_csv_export_has_header_and_rows():
+    ex = make_executor(approval_states=[])
+    ex.step("fault event is confirmed")
+    csv_text = ex.to_csv()
+    lines = [ln for ln in csv_text.splitlines() if ln.strip()]
+    assert lines[0].startswith("seq,ts,event,actor")
+    assert len(lines) == 2  # header + one transition
+    assert "transition" in lines[1]
+
+
+def test_to_json_embeds_actor_and_audit_verdict():
+    ex = make_executor(approval_states=[], actor="agent.bot")
+    ex.step("fault event is confirmed")
+    parsed = json.loads(ex.to_json())
+    assert parsed["actor"] == "agent.bot"
+    assert parsed["audit"]["ok"] is True

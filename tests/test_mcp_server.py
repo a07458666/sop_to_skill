@@ -125,3 +125,17 @@ def test_audit_trail_records_transitions():
     assert payload["final_state"] == "document_no_fault_found"
     assert payload["is_terminal"] is True
     assert [e["event"] for e in payload["trail"]] == ["transition"]
+
+
+def test_audit_trail_records_actor_and_verifies():
+    server = MCPServer()
+    _call(server, "sop_start", {"flow_path": FLOW})
+    _call(
+        server,
+        "sop_report_outcome",
+        {"outcome": "event is duplicate or false alarm", "actor": "engineer.lin"},
+    )
+    payload, is_error = _call(server, "sop_audit_trail")
+    assert not is_error
+    assert payload["trail"][0]["actor"] == "engineer.lin"
+    assert payload["audit"]["ok"] is True

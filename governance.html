@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP-to-Skill: 治理 · 版本比較</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body data-page="governance">
+
+    <div class="container">
+        <nav class="topnav">
+            <a href="index.html"><i data-lucide="arrow-left" style="width:16px;"></i> 回到三步流程</a>
+            <a href="governance.html" class="active"><i data-lucide="git-compare" style="width:16px;"></i> 治理 · 版本比較</a>
+        </nav>
+
+        <header>
+            <div class="badge">Governance</div>
+            <h1>狀態機版本比較 (Flow Diff)</h1>
+            <p>比較同一份 SOP 的兩個 <code>flow.json</code> 版本,在圖層級看出 state、欄位(含核准閘)、分支的差異——作為變更審核與回溯的依據。</p>
+        </header>
+
+        <section class="glass-card">
+            <p class="intg-hint" id="diff-status">載入中…</p>
+            <div class="compiler-layout">
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="file-clock" style="width:16px;"></i> 舊版 flow.json</div>
+                        <button class="intg-btn tiny secondary" onclick="loadCurrentFlowIntoDiff()"><i data-lucide="rotate-ccw" style="width:13px;"></i> 用目前編譯結果</button>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="diff-old" class="rule-editor" placeholder="貼上舊版 flow.json…"></textarea>
+                    </div>
+                </div>
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="file-plus" style="width:16px;"></i> 新版 flow.json</div>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="diff-new" class="rule-editor" placeholder="貼上新版 flow.json…"></textarea>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-compile" onclick="runFlowDiff()"><i data-lucide="git-compare" style="width:18px;"></i> 比較兩版狀態機</button>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="clipboard-list"></i> 差異報告</h2>
+            <div class="editor-container">
+                <div id="diff-output" class="code-display">// 按「比較兩版狀態機」後,這裡會顯示圖層級差異報告…</div>
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="sparkles"></i> 演化建議：把差異寫回 SOP</h2>
+            <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.95rem;">把圖層級差異反映回人類可讀 SOP 的修訂建議(SOP 為單一事實來源,審核後重編譯即生效)。完整的自動提案(依執行缺口 → 有界編輯 → held-out 驗證)由 <code>evolve.py</code> / <code>optimizer.py</code> CLI 執行。</p>
+            <div class="editor-container">
+                <div id="evolve-output" class="code-display">// 比較後,這裡會列出建議的 SOP 修訂…</div>
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 新版流程圖（差異標示）</h2>
+            <div class="flow-legend">
+                <span><span class="swatch" style="background: var(--green);"></span> 新增 state</span>
+                <span><span class="swatch" style="background: var(--amber);"></span> 變更 state（欄位 / 分支）</span>
+                <span style="color: var(--text-muted);">移除的 state 只出現在上方文字報告</span>
+            </div>
+            <div class="flow-container" id="flow-container"></div>
+            <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-placeholder">
+                    <i data-lucide="info"></i>
+                    <span>比較後點任一節點，查看該 state 的工具 / 判讀 / 路由細節。</span>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>SOP-to-Skill Compiler Concept Guide &copy; 2026. Powered by Google Gemini.</p>
+        </footer>
+    </div>
+    <script src="assets/app.js"></script>
+</body>
+</html>

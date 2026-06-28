@@ -925,10 +925,11 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         function renderFlowFromGeneratedJson() {
             const flow = parseGeneratedFlow();
             const container = document.getElementById('flow-container');
+            if (!container) return;
             container.innerHTML = '';
 
             const svgNs = 'http://www.w3.org/2000/svg';
-            const dims = { nodeWidth: 246, nodeHeight: 116, gapX: 60, gapY: 90, marginX: 48, marginY: 40 };
+            const dims = { nodeWidth: 240, nodeHeight: 84, gapX: 56, gapY: 76, marginX: 44, marginY: 36 };
             const { nodeWidth, nodeHeight } = dims;
             const { positions, backEdges, width, height } = computeFlowLayout(flow, dims);
 
@@ -1066,12 +1067,11 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
                 group.innerHTML = `
                     <rect width="${nodeWidth}" height="${nodeHeight}" rx="8"></rect>
-                    <rect width="5" height="${nodeHeight}" rx="2" fill="${typeColor}" opacity="0.9"></rect>
-                    <text class="flow-node-type" x="20" y="25" fill="${typeColor}">${state.type === 'end_state' ? 'END STATE' : state.type.toUpperCase()}</text>
+                    <rect width="4" height="${nodeHeight}" rx="2" fill="${typeColor}" opacity="0.8"></rect>
+                    <text class="flow-node-type" x="18" y="24" fill="${typeColor}">${state.type === 'end_state' ? 'END' : state.type.toUpperCase()}</text>
                     ${kindBadge}
-                    <text class="flow-node-title" x="20" y="54">${escapeHtml(title)}</text>
-                    <text class="flow-node-tool" x="20" y="80">${escapeHtml(truncate(transportText, 32))}</text>
-                    ${returnsText ? `<text class="flow-node-returns" x="20" y="100">${escapeHtml(truncate(returnsText, 34))}</text>` : ''}
+                    <text class="flow-node-title" x="18" y="50">${escapeHtml(title)}</text>
+                    <text class="flow-node-tool" x="18" y="70">${escapeHtml(truncate(transportText, 34))}</text>
                 `;
                 group.addEventListener('click', () => inspectNode(state.id, group));
                 svg.appendChild(group);
@@ -2089,8 +2089,190 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             renderCompiledArtifacts();
             resetSimulation();
         }
+        // ==== flowdiff (JS port — keep in parity with flowdiff.py) ====
+        // Structured graph-level diff between two compiled flows, for the governance page.
+        const FLOWDIFF_SCALAR_FIELDS = ['type', 'description', 'tool', 'tool_kind', 'mcp_server', 'signal_field', 'requires_approval'];
+        const FLOWDIFF_LIST_FIELDS = ['parameters', 'returns'];
+
+        function _flowScalar(v) { return v === undefined ? null : v; }
+
+        function _diffState(oldState, newState) {
+            const fields = {};
+            FLOWDIFF_SCALAR_FIELDS.forEach(name => {
+                const ov = _flowScalar(oldState[name]);
+                const nv = _flowScalar(newState[name]);
+                if (ov !== nv) fields[name] = { old: ov, new: nv };
+            });
+            FLOWDIFF_LIST_FIELDS.forEach(name => {
+                const ov = oldState[name] || [];
+                const nv = newState[name] || [];
+                if (JSON.stringify(ov) !== JSON.stringify(nv)) fields[name] = { old: ov, new: nv };
+            });
+            const oldT = oldState.next_states || {};
+            const newT = newState.next_states || {};
+            const added = {};
+            const removed = {};
+            const retargeted = {};
+            Object.keys(newT).forEach(k => { if (!(k in oldT)) added[k] = newT[k]; });
+            Object.keys(oldT).forEach(k => { if (!(k in newT)) removed[k] = oldT[k]; });
+            Object.keys(oldT).forEach(k => { if (k in newT && oldT[k] !== newT[k]) retargeted[k] = { old: oldT[k], new: newT[k] }; });
+
+            const record = {};
+            if (Object.keys(fields).length) record.fields = fields;
+            if (Object.keys(added).length) record.transitions_added = added;
+            if (Object.keys(removed).length) record.transitions_removed = removed;
+            if (Object.keys(retargeted).length) record.transitions_retargeted = retargeted;
+            return record;
+        }
+
+        function diffFlows(oldFlow, newFlow) {
+            const oldStates = oldFlow.states || [];
+            const newStates = newFlow.states || [];
+            const oldById = {};
+            const newById = {};
+            oldStates.forEach(s => { oldById[s.id] = s; });
+            newStates.forEach(s => { newById[s.id] = s; });
+
+            const diff = {
+                sop_name: oldFlow.sop_name !== newFlow.sop_name ? { old: oldFlow.sop_name, new: newFlow.sop_name } : null,
+                start_state: oldFlow.start_state !== newFlow.start_state ? { old: oldFlow.start_state, new: newFlow.start_state } : null,
+                states_added: newStates.filter(s => !(s.id in oldById)).map(s => s.id),
+                states_removed: oldStates.filter(s => !(s.id in newById)).map(s => s.id),
+                states_changed: {}
+            };
+            newStates.filter(s => s.id in oldById).forEach(s => {
+                const record = _diffState(oldById[s.id], newById[s.id]);
+                if (Object.keys(record).length) diff.states_changed[s.id] = record;
+            });
+            return diff;
+        }
+
+        function hasFlowChanges(diff) {
+            return !!(diff.sop_name || diff.start_state
+                || diff.states_added.length || diff.states_removed.length
+                || Object.keys(diff.states_changed).length);
+        }
+
+        function _fmtDiff(value) {
+            if (value === null || value === undefined) return '`null`';
+            if (typeof value === 'boolean') return '`' + value + '`';
+            if (Array.isArray(value)) return value.length ? '`' + value.join(', ') + '`' : '`(空)`';
+            return '`' + value + '`';
+        }
+
+        function renderFlowDiffMarkdown(diff, oldName, newName) {
+            let out = '# 狀態機 Diff (Flow Diff)\n\n';
+            out += '- **舊版**: `' + (oldName || 'old') + '`\n';
+            out += '- **新版**: `' + (newName || 'new') + '`\n\n';
+            if (!hasFlowChanges(diff)) return out + '兩版狀態機完全相同，無圖層級變更。\n';
+
+            if (diff.sop_name) out += '## SOP 名稱\n\n- ' + _fmtDiff(diff.sop_name.old) + ' → ' + _fmtDiff(diff.sop_name.new) + '\n\n';
+            if (diff.start_state) out += '## 起始 state\n\n- ' + _fmtDiff(diff.start_state.old) + ' → ' + _fmtDiff(diff.start_state.new) + '\n\n';
+            if (diff.states_added.length) out += '## 新增 state\n\n' + diff.states_added.map(s => '- `' + s + '`').join('\n') + '\n\n';
+            if (diff.states_removed.length) out += '## 移除 state\n\n' + diff.states_removed.map(s => '- `' + s + '`').join('\n') + '\n\n';
+            if (Object.keys(diff.states_changed).length) {
+                out += '## 變更 state\n\n';
+                Object.entries(diff.states_changed).forEach(([sid, record]) => {
+                    out += '### `' + sid + '`\n\n';
+                    Object.entries(record.fields || {}).forEach(([f, c]) => { out += '- **' + f + '**: ' + _fmtDiff(c.old) + ' → ' + _fmtDiff(c.new) + '\n'; });
+                    Object.entries(record.transitions_added || {}).forEach(([o, t]) => { out += '- ➕ 分支 `' + o + '` → `' + t + '`\n'; });
+                    Object.entries(record.transitions_removed || {}).forEach(([o, t]) => { out += '- ➖ 分支 `' + o + '`（原指向 `' + t + '`）\n'; });
+                    Object.entries(record.transitions_retargeted || {}).forEach(([o, c]) => { out += '- 🔀 分支 `' + o + '`：`' + c.old + '` → `' + c.new + '`\n'; });
+                    out += '\n';
+                });
+            }
+            return out;
+        }
+        // ==== end flowdiff ====
+
+        // Evolve (closing-the-loop, web surface): translate a graph-level diff into a
+        // reviewable list of SOP-markdown edits. The full auto-proposal loop (gap
+        // detection → bounded edits → held-out gate) runs in evolve.py / optimizer.py
+        // (needs rollouts); here we render the "edits back to the human-owned SOP" half.
+        function renderEvolveSuggestions(diff) {
+            if (!hasFlowChanges(diff)) return '兩版相同，SOP 不需修訂。\n';
+            const lines = ['# 演化建議：把差異寫回 SOP\n'];
+            lines.push('SOP 是單一事實來源。以下把上方圖層級差異，反映回人類可讀 SOP 的修訂建議；審核後更新 .md 並重新編譯即生效。\n');
+            diff.states_added.forEach(id => lines.push('- ➕ 新增步驟 `' + id + '`：在 SOP 增加對應的 `### Step` / `### State` 段落。'));
+            diff.states_removed.forEach(id => lines.push('- ➖ 移除步驟 `' + id + '`：刪除其段落，並改接其上游分支。'));
+            Object.entries(diff.states_changed).forEach(([id, rec]) => {
+                const f = rec.fields || {};
+                if (f.signal_field) lines.push('- 🔧 `' + id + '`：把 **Signal** 改為 `' + f.signal_field.new + '`。');
+                if (f.returns) lines.push('- 🔧 `' + id + '`：更新 **Returns** 為 ' + ((f.returns.new || []).map(x => '`' + x + '`').join(', ') || '（無）') + '。');
+                if (f.parameters) lines.push('- 🔧 `' + id + '`：更新工具參數為 ' + ((f.parameters.new || []).map(x => '`' + x + '`').join(', ') || '（無）') + '。');
+                if (f.requires_approval) {
+                    lines.push(f.requires_approval.new === true
+                        ? '- 🔒 `' + id + '`：加上核准閘（在該步驟加一行 `**Approval**: required`）。'
+                        : '- 🔓 `' + id + '`：移除核准閘（`**Approval**: no`）。');
+                }
+                Object.entries(rec.transitions_added || {}).forEach(([o, t]) => lines.push('- ➕ `' + id + '` 新增分支：outcome 「' + o + '」→ `' + t + '`（在該步驟 Branching 下加一條 If 規則）。'));
+                Object.entries(rec.transitions_retargeted || {}).forEach(([o, c]) => lines.push('- 🔀 `' + id + '` 分支「' + o + '」：改指向 `' + c.new + '`（原 `' + c.old + '`）。'));
+                Object.entries(rec.transitions_removed || {}).forEach(([o, t]) => lines.push('- ➖ `' + id + '` 移除分支「' + o + '」（原指向 `' + t + '`）。'));
+            });
+            return lines.join('\n') + '\n';
+        }
+
+        function loadCurrentFlowIntoDiff() {
+            const box = document.getElementById('diff-old');
+            const saved = loadState();
+            if (box && saved && saved.files && saved.files['flow-json']) {
+                box.value = saved.files['flow-json'];
+            }
+            return !!(saved && saved.files && saved.files['flow-json']);
+        }
+
+        function runFlowDiff() {
+            const oldBox = document.getElementById('diff-old');
+            const newBox = document.getElementById('diff-new');
+            const out = document.getElementById('diff-output');
+            const status = document.getElementById('diff-status');
+            if (!oldBox || !newBox || !out) return;
+            try {
+                const oldFlow = JSON.parse(oldBox.value.trim());
+                const newFlow = JSON.parse(newBox.value.trim());
+                const diff = diffFlows(oldFlow, newFlow);
+                out.textContent = renderFlowDiffMarkdown(diff, oldFlow.sop_name || '舊版', newFlow.sop_name || '新版');
+                // Overlay the diff on the NEW flow's graph: added = green, changed = amber.
+                generatedFiles['flow-json'] = JSON.stringify(newFlow, null, 2);
+                renderFlowFromGeneratedJson();
+                decorateFlowDiff(diff);
+                const evolveOut = document.getElementById('evolve-output');
+                if (evolveOut) evolveOut.textContent = renderEvolveSuggestions(diff);
+                if (status) {
+                    status.textContent = hasFlowChanges(diff)
+                        ? '兩版狀態機有差異（下方為差異報告與新版流程圖，綠＝新增、琥珀＝變更）。'
+                        : '兩版狀態機完全相同。';
+                }
+            } catch (e) {
+                if (status) status.textContent = '無法解析 flow.json：' + e.message;
+            }
+        }
+
+        // Tint the new flow's nodes by diff status (removed states only appear in the report).
+        function decorateFlowDiff(diff) {
+            const container = document.getElementById('flow-container');
+            if (!container) return;
+            const mark = (id, cls) => {
+                const g = container.querySelector('.flow-svg-node[data-node-id="' + id + '"]');
+                if (g) g.classList.add(cls);
+            };
+            diff.states_added.forEach(id => mark(id, 'diff-added'));
+            Object.keys(diff.states_changed).forEach(id => mark(id, 'diff-changed'));
+        }
+
+        function initGovernance() {
+            const had = loadCurrentFlowIntoDiff();
+            const status = document.getElementById('diff-status');
+            if (status) {
+                status.textContent = had
+                    ? '已把目前編譯結果帶入「舊版」。貼上另一版 flow.json 到「新版」後按「比較」。'
+                    : '貼上兩版 flow.json 後按「比較」。（從 Converter 編譯後，這裡會自動帶入舊版）';
+            }
+        }
+
         (function initPage() {
             const page = (document.body && document.body.dataset && document.body.dataset.page) || 'converter';
             if (page === 'simulator') initSimulator();
+            else if (page === 'governance') initGovernance();
             else initConverter();
         })();

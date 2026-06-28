@@ -26,6 +26,7 @@
                 <span class="step-num">3</span><span class="step-text"><b>證明</b><span class="step-sub">模擬 Agent 執行</span></span>
             </span>
         </nav>
+        <div class="gov-entry"><a href="governance.html"><i data-lucide="git-compare" style="width:13px;vertical-align:-2px;"></i> 進階 · 治理：比較兩版 SOP 狀態機</a></div>
 
         <header>
             <div class="badge">Runtime Simulator</div>
@@ -64,14 +65,6 @@
             <h2 class="section-title"><i data-lucide="git-commit"></i> 狀態機流程視覺化</h2>
             <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">點任一節點，查看它呼叫的工具、回傳判讀與路由。</p>
 
-            <div class="flow-legend">
-                <span><span class="swatch" style="background: var(--secondary);"></span> API action（REST 查詢）</span>
-                <span><span class="swatch" style="background: var(--accent);"></span> MCP action（MCP server 工具）</span>
-                <span><span class="swatch" style="background: var(--accent); opacity:0.55;"></span> Decision（純判斷）</span>
-                <span><span class="swatch" style="background: var(--green);"></span> End state（終點）</span>
-                <span><span class="swatch line"></span> 迴圈 / 回邊 (loop)</span>
-            </div>
-
             <div class="flow-container" id="flow-container"></div>
 
             <!-- Inspector Panel -->
@@ -83,24 +76,19 @@
             </div>
 
         </section>
-        <!-- API / MCP Integration Configuration + Mount (one flow: ①設定 ②掛載) -->
-        <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="settings-2"></i> 整合與掛載 · ① 設定工具 I/O</h2>
-            <p class="intg-hint">依 <code>flow.json</code> 自動帶入工具 / 參數 / Returns / Signal；可編輯後按「套用設定」。</p>
+        <!-- Advanced: integration config + mount, collapsed so the simulator is the focus -->
+        <details class="glass-card">
+            <summary class="artifacts-summary"><i data-lucide="settings-2"></i> 進階：整合與掛載（設定工具 I/O、掛載 MCP server）</summary>
+            <p class="intg-hint" style="margin-top:14px;">依 <code>flow.json</code> 自動帶入工具 / 參數 / Returns / Signal；可編輯後按「套用設定」。<code>MCP</code> 工具需先掛載 server 才能在下方模擬器呼叫（也可在模擬器內就地掛載）。</p>
             <div class="intg-toolbar">
-                <button class="intg-btn" onclick="applyIntegration()"><i data-lucide="check-check" style="width:15px;"></i> 套用設定（讀取工具 / 輸出）</button>
+                <button class="intg-btn" onclick="applyIntegration()"><i data-lucide="check-check" style="width:15px;"></i> 套用設定</button>
                 <button class="intg-btn secondary" onclick="addMcpServer()"><i data-lucide="server" style="width:15px;"></i> 新增 MCP server</button>
                 <button class="intg-btn secondary" onclick="addApiTool()"><i data-lucide="globe" style="width:15px;"></i> 新增 API</button>
                 <button class="intg-btn secondary" onclick="reseedIntegration()"><i data-lucide="rotate-ccw" style="width:15px;"></i> 依 SOP 重設</button>
             </div>
             <div id="integration-editor"></div>
-        </section>
-        <!-- MCP / API Runtime Mounting & Validation -->
-        <section class="glass-card">
-            <h2 class="section-title"><i data-lucide="plug"></i> 整合與掛載 · ② 掛載 MCP server</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;"><code>MCP</code> 工具需先掛載對應 server,模擬器才能呼叫;<code>API</code> 直接以 REST 呼叫。</p>
-            <div class="mcp-grid" id="mcp-mount-panel"></div>
-        </section>
+            <div class="mcp-grid" id="mcp-mount-panel" style="margin-top:18px;"></div>
+        </details>
         <!-- Skill Execution Simulator -->
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="mouse-pointer-click"></i> Skill 執行模擬器</h2>
