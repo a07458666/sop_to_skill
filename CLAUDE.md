@@ -68,19 +68,35 @@ Output Skill bundle per SOP:
 - `tests/` — pytest suite: executor behaviour, the eval invariant, **golden
   snapshots** (`parser.py` output must match the committed `skills/*` bundles), and
   **parity** (`assets/app.js` JS compiles SOPs to the same graph as `parser.py`, run
-  under Node — the guardrail against the two implementations drifting).
+  under Node — the guardrail against the two implementations drifting; same pattern guards
+  the flowdiff and optimizer JS ports).
 - `index.html` (**Converter**) + `simulator.html` (**Simulator**) — the web demo, split into
   two GitHub Pages. Shared logic lives in `assets/app.js`, shared CSS in `assets/styles.css`
   (both pages link them; no build step). `app.js` re-implements the compiler in JS
   (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`) to stay at **parity
   with `parser.py`** (enforced by `tests/test_parity.py`, which reads `assets/app.js`).
-  - **Converter**: a two-step journey driven by a top stepper (`showStep`) — ① 編譯 (editor →
+  - The journey is a **four-step stepper** shared by all pages: ① 編譯 → ② 看懂 → ③ 驗證 →
+    ④ 優化 (+ a 進階 · 治理 entry below it).
+  - **Converter** (`index.html`): steps ①② as switchable panels (`showStep`) — ① 編譯 (editor →
     compile → SKILL.md/flow.json + a collapsed quality report card with a pass/fail badge) and
     ② 看懂 (the flow visualizer, the hero). Marketing/概念 and the `sop_rule.md` authoring editor
     are collapsed into `<details>`. 「前往模擬器」(`goToSimulator`) persists state and hands off
     to step ③; `index.html#review` deep-links straight to step ②.
-  - **Simulator**: loads the compiled flow from `localStorage` (or a pasted `flow.json` via
-    `loadPastedFlow`) → integration config editor + MCP mount panel + execution simulator.
+  - **Simulator** (`simulator.html`, step ③): loads the compiled flow from `localStorage` (or a
+    pasted `flow.json` via `loadPastedFlow`) → execution simulator (integration config + MCP
+    mount live in a collapsed 進階 details). Bottom CTA hands off to step ④.
+  - **Optimize** (`optimize.html`, `data-page="optimize"`, step ④): the **SkillOpt-style
+    optimization loop running fully in the browser** — a JS port of `optimizer.py`
+    (the `// ==== optimizer` block in `app.js`: `oracleRun`/`scoreFlowJs`/`detectGapsJs`/
+    `candidateEditsJs`/`optimizeFlowJs`, kept in parity by `tests/test_optimizer_parity.py`
+    across all four bundled flows: same accepted edits, rounds, rejected buffer, scores, final
+    graph). Validation scenarios are **auto-seeded from the flow** (`seedScenariosFromFlow`,
+    one BFS path per end state; user-editable JSON). Demo affordance: 「製造缺口」 drops a chosen
+    transition (`optDropTransition`), then 「執行優化」 (`optRun`) repairs it, shows the report
+    (score before→after, accepted/rejected), overlays changes on the graph, renders SOP-edit
+    suggestions (`renderEvolveSuggestions`), and can download the optimized flow or hand off
+    old+new to governance via `localStorage` `STORAGE_KEY:gov_handoff` (`optSendToGovernance`;
+    `initGovernance` consumes the key and auto-runs the diff).
   - **Governance** (`governance.html`, `data-page="governance"`): the 進階 · 治理 entry — paste
     two `flow.json` versions (old defaults from `localStorage`) and render a graph-level diff via
     a **JS port of `flowdiff.py`** (the `// ==== flowdiff` block in `app.js`, kept in parity by
@@ -100,7 +116,7 @@ Output Skill bundle per SOP:
 - `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
 - `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
 - `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
-  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html governance.html` + `node --check assets/app.js`),
+  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html governance.html optimize.html` + `node --check assets/app.js`),
   test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
   GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
 - `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
@@ -191,7 +207,7 @@ Surfaced in the node inspector, simulator, and quality report.
 ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/
 python3 -m pytest tests/ -q
 python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
-html-validate index.html simulator.html governance.html
+html-validate index.html simulator.html governance.html optimize.html
 node --check assets/app.js   # shared web-demo JS
 # Regenerate committed skills (offline fallback; no GEMINI_API_KEY needed):
 python3 parser.py --input sample_sop.md --output-dir skills/tool_fault_investigation --rules sop_rule.md

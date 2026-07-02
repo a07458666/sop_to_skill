@@ -2261,6 +2261,22 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         }
 
         function initGovernance() {
+            // Hand-off from the optimizer page: prefill both versions and diff immediately.
+            let handoff = null;
+            try { handoff = JSON.parse(localStorage.getItem(STORAGE_KEY + ':gov_handoff') || 'null'); } catch (e) { handoff = null; }
+            if (handoff && handoff.old && handoff.new) {
+                localStorage.removeItem(STORAGE_KEY + ':gov_handoff');
+                const oldBox = document.getElementById('diff-old');
+                const newBox = document.getElementById('diff-new');
+                if (oldBox && newBox) {
+                    oldBox.value = JSON.stringify(handoff.old, null, 2);
+                    newBox.value = JSON.stringify(handoff.new, null, 2);
+                    runFlowDiff();
+                    const status = document.getElementById('diff-status');
+                    if (status) status.textContent = '已載入優化前 / 優化後兩版（來自優化頁），差異如下。';
+                    return;
+                }
+            }
             const had = loadCurrentFlowIntoDiff();
             const status = document.getElementById('diff-status');
             if (status) {
@@ -2270,9 +2286,328 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             }
         }
 
+        // ==== optimizer (JS port — keep in parity with optimizer.py) ====
+        // Structured self-evolution (M2.5): bounded graph edits, accepted only on a strict
+        // held-out validation improvement. Deterministic — no LLM, no network — so the full
+        // loop runs in the browser. Mirrors optimizer.py exactly; guarded by
+        // tests/test_optimizer_parity.py.
+        function editKey(edit) {
+            return [edit.kind, edit.state_id, edit.outcome || '', edit.target || '', edit.field_value || ''].join('\u0001');
+        }
+
+        function describeEdit(edit) {
+            if (edit.kind === 'add_transition') {
+                return "add_transition(" + edit.state_id + ": '" + edit.outcome + "' -> " + edit.target + ")";
+            }
+            if (edit.kind === 'set_signal_field') {
+                return 'set_signal_field(' + edit.state_id + ' = ' + edit.field_value + ')';
+            }
+            return edit.kind + '(' + edit.state_id + ')';
+        }
+
+        function applyEditToFlow(edit, flow) {
+            const data = JSON.parse(JSON.stringify(flow));
+            data.states.forEach(st => {
+                if (st.id !== edit.state_id) return;
+                if (edit.kind === 'add_transition') {
+                    const ns = st.next_states || {};
+                    ns[edit.outcome] = edit.target;
+                    st.next_states = ns;
+                } else if (edit.kind === 'set_signal_field') {
+                    st.signal_field = edit.field_value;
+                }
+            });
+            return data;
+        }
+
+        function _flowValid(flow) {
+            const ids = new Set((flow.states || []).map(s => s.id));
+            if (!ids.has(flow.start_state)) return false;
+            return (flow.states || []).every(s =>
+                Object.values(s.next_states || {}).every(t => ids.has(t)));
+        }
+
+        function _isTerminalState(state) {
+            return state.type === 'end_state' || !Object.keys(state.next_states || {}).length;
+        }
+
+        function oracleRun(flow, scenario) {
+            // The oracle always picks the scenario's correct outcome; a missing outcome
+            // (adherence gap) fails the run — same contract as optimizer._oracle_run.
+            if (!_flowValid(flow)) return false;
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            let cur = flow.start_state;
+            let guard = 0;
+            while (!_isTerminalState(byId[cur]) && guard < flow.states.length + 3) {
+                guard += 1;
+                const correct = scenario.situation[cur];
+                if (correct === undefined) break;
+                if (!((byId[cur].next_states || {})[correct])) return false;
+                cur = byId[cur].next_states[correct];
+            }
+            return cur === scenario.expected_end_state && _isTerminalState(byId[cur]);
+        }
+
+        function scoreFlowJs(flow, scenarios) {
+            const s = { n: scenarios.length, correct_end: 0, blocked: 0 };
+            scenarios.forEach(sc => { if (oracleRun(flow, sc)) s.correct_end += 1; else s.blocked += 1; });
+            s.scalar = s.correct_end - 0.001 * s.blocked;
+            return s;
+        }
+
+        function detectGapsJs(flow, scenarios) {
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            const gaps = [];
+            const seen = new Set();
+            scenarios.forEach(sc => {
+                if (!_flowValid(flow)) return;
+                let cur = flow.start_state;
+                let guard = 0;
+                while (!_isTerminalState(byId[cur]) && guard < flow.states.length + 3) {
+                    guard += 1;
+                    const correct = sc.situation[cur];
+                    if (correct === undefined) break;
+                    if (!((byId[cur].next_states || {})[correct])) {
+                        const k = cur + '\u0001' + correct;
+                        if (!seen.has(k)) { seen.add(k); gaps.push([cur, correct]); }
+                        break;
+                    }
+                    cur = byId[cur].next_states[correct];
+                }
+            });
+            return gaps;
+        }
+
+        function candidateEditsJs(flow, gaps, rejected) {
+            const stateIds = flow.states.map(s => s.id);
+            const out = [];
+            gaps.forEach(([stateId, outcome]) => {
+                stateIds.forEach(target => {
+                    if (target === stateId) return;
+                    const edit = { kind: 'add_transition', state_id: stateId, outcome, target };
+                    if (!rejected.has(editKey(edit))) out.push(edit);
+                });
+            });
+            return out;
+        }
+
+        function optimizeFlowJs(flow, validation, editBudget, maxRounds) {
+            editBudget = editBudget === undefined ? 5 : editBudget;
+            maxRounds = maxRounds === undefined ? 10 : maxRounds;
+            let current = flow;
+            const rejected = new Set();
+            const result = {
+                flow: current, accepted: [], rejected_count: 0, rounds: 0,
+                start_score: scoreFlowJs(flow, validation).scalar, final_score: 0
+            };
+            let editsMade = 0;
+            while (editsMade < editBudget && result.rounds < maxRounds) {
+                result.rounds += 1;
+                const base = scoreFlowJs(current, validation);
+                const gaps = detectGapsJs(current, validation);
+                if (!gaps.length) break;
+                const candidates = candidateEditsJs(current, gaps, rejected);
+                if (!candidates.length) break;
+
+                let bestEdit = null;
+                let bestScore = base.scalar;
+                candidates.forEach(edit => {
+                    const candScore = scoreFlowJs(applyEditToFlow(edit, current), validation).scalar;
+                    if (candScore > bestScore) { bestScore = candScore; bestEdit = edit; }
+                });
+
+                if (bestEdit === null) {
+                    candidates.forEach(edit => rejected.add(editKey(edit)));
+                    result.rejected_count += candidates.length;
+                    break;
+                }
+                candidates.forEach(edit => { if (editKey(edit) !== editKey(bestEdit)) rejected.add(editKey(edit)); });
+                result.rejected_count += candidates.length - 1;
+                current = applyEditToFlow(bestEdit, current);
+                result.accepted.push({ edit: bestEdit, before: base.scalar, after: bestScore });
+                editsMade += 1;
+            }
+            result.flow = current;
+            result.final_score = scoreFlowJs(current, validation).scalar;
+            return result;
+        }
+        // ==== end optimizer ====
+
+        // Seed a validation set from the flow itself: one scenario per reachable end
+        // state (BFS shortest path), so optimization works for any compiled SOP without
+        // hand-written scenarios. The user can edit/extend the JSON before running.
+        function seedScenariosFromFlow(flow) {
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            const parent = {};   // state id -> [prevId, outcome]
+            const queue = [flow.start_state];
+            const visited = new Set([flow.start_state]);
+            while (queue.length) {
+                const cur = queue.shift();
+                Object.entries(byId[cur].next_states || {}).forEach(([outcome, target]) => {
+                    if (visited.has(target)) return;
+                    visited.add(target);
+                    parent[target] = [cur, outcome];
+                    queue.push(target);
+                });
+            }
+            const scenarios = [];
+            flow.states.forEach(state => {
+                if (!_isTerminalState(state) || !visited.has(state.id)) return;
+                const situation = {};
+                let cur = state.id;
+                while (parent[cur]) {
+                    const [prev, outcome] = parent[cur];
+                    situation[prev] = outcome;
+                    cur = prev;
+                }
+                if (state.id !== flow.start_state) {
+                    scenarios.push({
+                        name: 'path to ' + state.id,
+                        expected_end_state: state.id,
+                        situation
+                    });
+                }
+            });
+            return scenarios;
+        }
+
+        // --- optimize page (step ④) -------------------------------------------------
+        let optBaselineFlow = null;   // the flow before optimization (after any demo drop)
+        let optResultFlow = null;     // the optimized flow
+
+        function optSetStatus(text) {
+            const el = document.getElementById('opt-status');
+            if (el) el.textContent = text;
+        }
+
+        function optRenderFlow(flow, diff) {
+            generatedFiles['flow-json'] = JSON.stringify(flow, null, 2);
+            renderFlowFromGeneratedJson();
+            if (diff) decorateFlowDiff(diff);
+        }
+
+        function optRefreshDropOptions(flow) {
+            const sel = document.getElementById('opt-drop-select');
+            if (!sel) return;
+            sel.innerHTML = '';
+            flow.states.forEach(state => {
+                Object.keys(state.next_states || {}).forEach(outcome => {
+                    const opt = document.createElement('option');
+                    opt.value = state.id + '\u0001' + outcome;
+                    opt.textContent = state.id + ' → 「' + outcome + '」';
+                    sel.appendChild(opt);
+                });
+            });
+        }
+
+        function optLoadFlow(flow, sourceLabel) {
+            optBaselineFlow = JSON.parse(JSON.stringify(flow));
+            optResultFlow = null;
+            const scBox = document.getElementById('opt-scenarios');
+            if (scBox) scBox.value = JSON.stringify(seedScenariosFromFlow(flow), null, 2);
+            optRefreshDropOptions(flow);
+            optRenderFlow(flow, null);
+            const report = document.getElementById('opt-report');
+            if (report) report.textContent = '// 按「執行優化」後，這裡會顯示每一輪的評分與被接受的編輯…';
+            const evolveOut = document.getElementById('opt-evolve');
+            if (evolveOut) evolveOut.textContent = '// 優化後，這裡會列出建議寫回 SOP 的修訂…';
+            optSetStatus(sourceLabel + '。驗證情境已依流程自動生成（可編輯）。可先「製造缺口」示範，或直接執行優化。');
+        }
+
+        function optLoadPastedFlow() {
+            const box = document.getElementById('opt-flow-paste');
+            if (!box || !box.value.trim()) return;
+            try {
+                optLoadFlow(JSON.parse(box.value.trim()), '已載入貼上的 flow.json');
+            } catch (e) {
+                optSetStatus('無法解析 flow.json：' + e.message);
+            }
+        }
+
+        function optDropTransition() {
+            if (!optBaselineFlow) return;
+            const sel = document.getElementById('opt-drop-select');
+            if (!sel || !sel.value) return;
+            const [stateId, outcome] = sel.value.split('\u0001');
+            optBaselineFlow.states.forEach(st => {
+                if (st.id === stateId && st.next_states) delete st.next_states[outcome];
+            });
+            optResultFlow = null;
+            optRefreshDropOptions(optBaselineFlow);
+            optRenderFlow(optBaselineFlow, null);
+            optSetStatus('已移除分支 ' + stateId + ' → 「' + outcome + '」（模擬 SOP 缺漏）。執行優化，看它能否自動找回。');
+        }
+
+        function optRun() {
+            if (!optBaselineFlow) { optSetStatus('請先載入 flow.json（從 Converter 編譯，或在下方貼上）。'); return; }
+            let scenarios;
+            try {
+                scenarios = JSON.parse(document.getElementById('opt-scenarios').value);
+            } catch (e) { optSetStatus('無法解析驗證情境 JSON：' + e.message); return; }
+            if (!Array.isArray(scenarios) || !scenarios.length) { optSetStatus('驗證情境需為非空陣列。'); return; }
+            const budget = Math.max(1, parseInt(document.getElementById('opt-budget').value, 10) || 5);
+
+            const result = optimizeFlowJs(optBaselineFlow, scenarios, budget);
+            optResultFlow = result.flow;
+
+            let md = '# 優化報告（SkillOpt 式結構化自我演化）\n\n';
+            md += '- 驗證分數（correct-end）：**' + result.start_score.toFixed(3) + ' → ' + result.final_score.toFixed(3) + '**（' + result.rounds + ' 輪）\n';
+            md += '- 接受的編輯：**' + result.accepted.length + '**；駁回（緩衝）：**' + result.rejected_count + '**\n\n';
+            md += '## 被接受的編輯（每一筆都通過「嚴格改善驗證分數」關卡）\n\n';
+            if (result.accepted.length) {
+                result.accepted.forEach(a => {
+                    md += '- `' + describeEdit(a.edit) + '`（驗證 ' + a.before.toFixed(3) + ' → ' + a.after.toFixed(3) + '）\n';
+                });
+            } else {
+                md += '- 無（流程已滿足驗證情境，或沒有任何編輯能嚴格改善分數）。\n';
+            }
+            const report = document.getElementById('opt-report');
+            if (report) report.textContent = md;
+
+            const diff = diffFlows(optBaselineFlow, optResultFlow);
+            optRenderFlow(optResultFlow, diff);
+            const evolveOut = document.getElementById('opt-evolve');
+            if (evolveOut) evolveOut.textContent = renderEvolveSuggestions(diff);
+            optSetStatus(result.accepted.length
+                ? '優化完成：接受 ' + result.accepted.length + ' 筆編輯（圖上琥珀＝變更的 state）。請審核下方 SOP 修訂建議，或送往治理頁比對。'
+                : '優化完成：沒有可接受的編輯。');
+        }
+
+        function optDownloadFlow() {
+            if (!optResultFlow) { optSetStatus('請先執行優化。'); return; }
+            const blob = new Blob([JSON.stringify(optResultFlow, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'flow.optimized.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function optSendToGovernance() {
+            if (!optBaselineFlow || !optResultFlow) { optSetStatus('請先執行優化，再送往治理頁。'); return; }
+            localStorage.setItem(STORAGE_KEY + ':gov_handoff',
+                JSON.stringify({ old: optBaselineFlow, new: optResultFlow }));
+            window.location.href = 'governance.html';
+        }
+
+        function initOptimize() {
+            const saved = loadState();
+            if (saved && saved.files && saved.files['flow-json']) {
+                try {
+                    optLoadFlow(JSON.parse(saved.files['flow-json']), '已載入 Converter 編譯的 flow.json');
+                    return;
+                } catch (e) { /* fall through to the paste prompt */ }
+            }
+            optSetStatus('尚未載入 flow.json。請先在 ① 編譯，或展開下方「貼上 flow.json」。');
+        }
+
         (function initPage() {
             const page = (document.body && document.body.dataset && document.body.dataset.page) || 'converter';
             if (page === 'simulator') initSimulator();
             else if (page === 'governance') initGovernance();
+            else if (page === 'optimize') initOptimize();
             else initConverter();
         })();

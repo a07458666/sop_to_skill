@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP-to-Skill: Skill 優化</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body data-page="optimize">
+
+    <div class="container">
+        <nav class="stepper">
+            <a class="step done" href="index.html">
+                <span class="step-num">1</span><span class="step-text"><b>編譯</b><span class="step-sub">SOP → 合法 Skill</span></span>
+            </a>
+            <span class="step-line"></span>
+            <a class="step done" href="index.html#review">
+                <span class="step-num">2</span><span class="step-text"><b>看懂</b><span class="step-sub">流程圖 + 核准閘</span></span>
+            </a>
+            <span class="step-line"></span>
+            <a class="step done" href="simulator.html">
+                <span class="step-num">3</span><span class="step-text"><b>驗證</b><span class="step-sub">模擬 Agent 執行</span></span>
+            </a>
+            <span class="step-line"></span>
+            <span class="step active">
+                <span class="step-num">4</span><span class="step-text"><b>優化</b><span class="step-sub">自動修復 SOP 缺口</span></span>
+            </span>
+        </nav>
+        <div class="gov-entry"><a href="governance.html"><i data-lucide="git-compare" style="width:13px;vertical-align:-2px;"></i> 進階 · 治理：比較兩版 SOP 狀態機</a></div>
+
+        <header>
+            <div class="badge">Skill Optimization</div>
+            <h1>Skill 自動優化</h1>
+            <p>用「驗證情境」跑你的 Skill：流程缺漏的分支會被自動找出，提出<b>有界的圖編輯</b>，且只有<b>嚴格提升驗證分數</b>的編輯會被接受——最後轉成 SOP 修訂建議交回給你審核。</p>
+        </header>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="flask-conical"></i> 驗證情境與優化設定</h2>
+            <p class="intg-hint" id="opt-status">載入中…</p>
+            <div class="compiler-layout">
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="list-checks" style="width:16px;"></i> 驗證情境（自動生成，可編輯）</div>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="opt-scenarios" class="rule-editor" placeholder="[ { name, expected_end_state, situation: { state: outcome } } ]"></textarea>
+                    </div>
+                </div>
+                <div>
+                    <div class="panel-header">
+                        <div class="panel-title"><i data-lucide="sliders-horizontal" style="width:16px;"></i> 執行</div>
+                    </div>
+                    <div class="opt-controls">
+                        <label class="opt-label">示範：先移除一條分支，製造 SOP 缺口
+                            <select id="opt-drop-select" class="opt-select"></select>
+                        </label>
+                        <button class="intg-btn secondary" onclick="optDropTransition()"><i data-lucide="scissors" style="width:15px;"></i> 製造缺口（示範）</button>
+                        <label class="opt-label">編輯預算（最多接受幾筆編輯）
+                            <input id="opt-budget" class="opt-input" type="number" min="1" max="20" value="5">
+                        </label>
+                        <button class="btn-compile" onclick="optRun()"><i data-lucide="sparkles" style="width:18px;"></i> 執行優化</button>
+                    </div>
+                    <details style="margin-top:14px;">
+                        <summary class="artifacts-summary" style="font-size:0.9rem;">貼上 flow.json（未從 ① 編譯時）</summary>
+                        <div class="editor-container" style="margin-top:10px;">
+                            <textarea id="opt-flow-paste" class="rule-editor" style="height:140px;" placeholder="貼上 flow.json…"></textarea>
+                        </div>
+                        <button class="intg-btn" style="margin-top:8px;" onclick="optLoadPastedFlow()"><i data-lucide="check" style="width:15px;"></i> 載入</button>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="git-commit"></i> 流程圖（優化後，琥珀＝變更）</h2>
+            <div class="flow-container" id="flow-container"></div>
+            <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-placeholder">
+                    <i data-lucide="info"></i>
+                    <span>點任一節點，查看該 state 的工具 / 判讀 / 路由細節。</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="clipboard-list"></i> 優化報告</h2>
+            <div class="editor-container">
+                <div id="opt-report" class="code-display">// 按「執行優化」後，這裡會顯示每一輪的評分與被接受的編輯…</div>
+            </div>
+        </section>
+
+        <section class="glass-card">
+            <h2 class="section-title"><i data-lucide="sparkles"></i> 寫回 SOP 的修訂建議</h2>
+            <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.95rem;">SOP 是單一事實來源：接受的圖編輯在此轉成人類可讀的 SOP 修訂，審核後更新 .md 並重新編譯即生效。</p>
+            <div class="editor-container">
+                <div id="opt-evolve" class="code-display">// 優化後，這裡會列出建議寫回 SOP 的修訂…</div>
+            </div>
+            <div class="page-cta" style="gap:12px; margin-top:18px;">
+                <button class="intg-btn secondary" onclick="optDownloadFlow()"><i data-lucide="download" style="width:15px;"></i> 下載優化後 flow.json</button>
+                <button class="btn-cta" onclick="optSendToGovernance()"><i data-lucide="git-compare"></i> 送往治理頁審核差異 &rarr;</button>
+            </div>
+        </section>
+
+        <footer>
+            <p>SOP-to-Skill Compiler Concept Guide &copy; 2026. Powered by Google Gemini.</p>
+        </footer>
+    </div>
+    <script src="assets/app.js"></script>
+</body>
+</html>
