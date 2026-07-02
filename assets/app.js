@@ -2400,7 +2400,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const rejected = new Set();
             const result = {
                 flow: current, accepted: [], rejected_count: 0, rounds: 0,
-                start_score: scoreFlowJs(flow, validation).scalar, final_score: 0
+                start_score: scoreFlowJs(flow, validation).scalar, final_score: 0,
+                trace: []   // per-round transparency for the UI; never affects behaviour
             };
             let editsMade = 0;
             while (editsMade < editBudget && result.rounds < maxRounds) {
@@ -2413,9 +2414,20 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
 
                 let bestEdit = null;
                 let bestScore = base.scalar;
+                const scored = [];
                 candidates.forEach(edit => {
                     const candScore = scoreFlowJs(applyEditToFlow(edit, current), validation).scalar;
+                    scored.push([candScore, edit]);
                     if (candScore > bestScore) { bestScore = candScore; bestEdit = edit; }
+                });
+                result.trace.push({
+                    round: result.rounds,
+                    base: base.scalar,
+                    gaps: gaps.map(g => g[0] + ' → 「' + g[1] + '」'),
+                    n_candidates: candidates.length,
+                    top: scored.slice().sort((a, b) => b[0] - a[0]).slice(0, 3)
+                        .map(([s, e]) => ({ score: s, edit: describeEdit(e) })),
+                    accepted: bestEdit ? describeEdit(bestEdit) : null
                 });
 
                 if (bestEdit === null) {
@@ -2474,9 +2486,77 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             return scenarios;
         }
 
+        // Per-scenario verdicts for the preview/result tables (pure; uses oracleRun).
+        function scenarioResults(flow, scenarios) {
+            return scenarios.map(sc => ({
+                name: sc.name || ('path to ' + sc.expected_end_state),
+                end: sc.expected_end_state,
+                ok: oracleRun(flow, sc)
+            }));
+        }
+
         // --- optimize page (step ④) -------------------------------------------------
         let optBaselineFlow = null;   // the flow before optimization (after any demo drop)
         let optResultFlow = null;     // the optimized flow
+
+        function optParseScenarios() {
+            try {
+                const scenarios = JSON.parse(document.getElementById('opt-scenarios').value);
+                return (Array.isArray(scenarios) && scenarios.length) ? scenarios : null;
+            } catch (e) { return null; }
+        }
+
+        // Render the per-scenario pass/fail table. With `after` (post-optimization
+        // verdicts) it becomes a before → after comparison.
+        function optRenderScenarioTable(before, after) {
+            const box = document.getElementById('opt-scenario-table');
+            if (!box) return;
+            const mark = ok => ok
+                ? '<span class="opt-ok">✓ 通過</span>'
+                : '<span class="opt-fail">✗ 失敗</span>';
+            let html = '<table class="opt-table"><thead><tr><th>驗證情境</th><th>預期終點</th>'
+                + (after ? '<th>優化前</th><th>優化後</th>' : '<th>目前</th>') + '</tr></thead><tbody>';
+            before.forEach((r, i) => {
+                html += '<tr><td>' + escapeHtml(r.name) + '</td><td><code>' + escapeHtml(r.end) + '</code></td>'
+                    + '<td>' + mark(r.ok) + '</td>'
+                    + (after ? '<td>' + mark(after[i].ok) + '</td>' : '') + '</tr>';
+            });
+            html += '</tbody></table>';
+            const passed = before.filter(r => r.ok).length;
+            const summary = after
+                ? '通過 ' + passed + '/' + before.length + ' → ' + after.filter(r => r.ok).length + '/' + after.length
+                : '通過 ' + passed + '/' + before.length;
+            box.innerHTML = '<div class="opt-table-summary">' + summary + '</div>' + html;
+        }
+
+        function optPreviewValidation() {
+            if (!optBaselineFlow) return;
+            const scenarios = optParseScenarios();
+            if (!scenarios) return;
+            optRenderScenarioTable(scenarioResults(optBaselineFlow, scenarios), null);
+        }
+
+        // Render the per-round optimization log (gaps → candidates → strict-gate verdict).
+        function optRenderTrace(result) {
+            const box = document.getElementById('opt-trace');
+            if (!box) return;
+            if (!result.trace.length) {
+                box.textContent = '（0 輪：流程已滿足驗證情境，沒有缺口可修。）';
+                return;
+            }
+            const lines = [];
+            result.trace.forEach(t => {
+                lines.push('第 ' + t.round + ' 輪　基準分數 ' + t.base.toFixed(3));
+                t.gaps.forEach(g => lines.push('  缺口：' + g));
+                lines.push('  候選 ' + t.n_candidates + ' 筆（每筆都以驗證情境重新評分），前 ' + t.top.length + ' 名：');
+                t.top.forEach(c => lines.push('    ' + c.score.toFixed(3) + '  ' + c.edit));
+                lines.push(t.accepted
+                    ? '  ✅ 接受：' + t.accepted + '（嚴格改善 → 通過關卡）'
+                    : '  ✗ 本輪無編輯嚴格改善分數：全部駁回並停止。');
+                lines.push('');
+            });
+            box.textContent = lines.join('\n');
+        }
 
         function optSetStatus(text) {
             const el = document.getElementById('opt-status');
@@ -2514,6 +2594,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             if (report) report.textContent = '// 按「執行優化」後，這裡會顯示每一輪的評分與被接受的編輯…';
             const evolveOut = document.getElementById('opt-evolve');
             if (evolveOut) evolveOut.textContent = '// 優化後，這裡會列出建議寫回 SOP 的修訂…';
+            const traceBox = document.getElementById('opt-trace');
+            if (traceBox) traceBox.textContent = '// 執行優化後，這裡會逐輪列出缺口、候選評分與關卡判定…';
+            optPreviewValidation();
             optSetStatus(sourceLabel + '。驗證情境已依流程自動生成（可編輯）。可先「製造缺口」示範，或直接執行優化。');
         }
 
@@ -2538,7 +2621,8 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             optResultFlow = null;
             optRefreshDropOptions(optBaselineFlow);
             optRenderFlow(optBaselineFlow, null);
-            optSetStatus('已移除分支 ' + stateId + ' → 「' + outcome + '」（模擬 SOP 缺漏）。執行優化，看它能否自動找回。');
+            optPreviewValidation();
+            optSetStatus('已移除分支 ' + stateId + ' → 「' + outcome + '」（模擬 SOP 缺漏）。下表顯示哪些情境因此失敗；執行優化，看它能否自動找回。');
         }
 
         function optRun() {
@@ -2550,8 +2634,11 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             if (!Array.isArray(scenarios) || !scenarios.length) { optSetStatus('驗證情境需為非空陣列。'); return; }
             const budget = Math.max(1, parseInt(document.getElementById('opt-budget').value, 10) || 5);
 
+            const beforeResults = scenarioResults(optBaselineFlow, scenarios);
             const result = optimizeFlowJs(optBaselineFlow, scenarios, budget);
             optResultFlow = result.flow;
+            optRenderScenarioTable(beforeResults, scenarioResults(optResultFlow, scenarios));
+            optRenderTrace(result);
 
             let md = '# 優化報告（SkillOpt 式結構化自我演化）\n\n';
             md += '- 驗證分數（correct-end）：**' + result.start_score.toFixed(3) + ' → ' + result.final_score.toFixed(3) + '**（' + result.rounds + ' 輪）\n';

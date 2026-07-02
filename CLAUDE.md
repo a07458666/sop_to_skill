@@ -93,8 +93,12 @@ Output Skill bundle per SOP:
     graph). Validation scenarios are **auto-seeded from the flow** (`seedScenariosFromFlow`,
     one BFS path per end state; user-editable JSON). Demo affordance: 「製造缺口」 drops a chosen
     transition (`optDropTransition`), then 「執行優化」 (`optRun`) repairs it, shows the report
-    (score before→after, accepted/rejected), overlays changes on the graph, renders SOP-edit
-    suggestions (`renderEvolveSuggestions`), and can download the optimized flow or hand off
+    (score before→after, accepted/rejected), a **per-scenario pass/fail table** (before→after,
+    live-updating as scenarios are edited; `scenarioResults`/`optRenderScenarioTable`), a
+    collapsed **per-round trace** (gaps → top-3 candidate scores → strict-gate verdict;
+    `result.trace` from `optimizeFlowJs`, UI-only field), overlays changes on the graph,
+    renders SOP-edit suggestions (`renderEvolveSuggestions`), and can download the optimized
+    flow or hand off
     old+new to governance via `localStorage` `STORAGE_KEY:gov_handoff` (`optSendToGovernance`;
     `initGovernance` consumes the key and auto-runs the diff).
   - **Governance** (`governance.html`, `data-page="governance"`): the 進階 · 治理 entry — paste

@@ -41,13 +41,14 @@
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="flask-conical"></i> 驗證情境與優化設定</h2>
             <p class="intg-hint" id="opt-status">載入中…</p>
+            <div id="opt-scenario-table"></div>
             <div class="compiler-layout">
                 <div>
                     <div class="panel-header">
                         <div class="panel-title"><i data-lucide="list-checks" style="width:16px;"></i> 驗證情境（自動生成，可編輯）</div>
                     </div>
                     <div class="editor-container">
-                        <textarea id="opt-scenarios" class="rule-editor" placeholder="[ { name, expected_end_state, situation: { state: outcome } } ]"></textarea>
+                        <textarea id="opt-scenarios" class="rule-editor" oninput="optPreviewValidation()" placeholder="[ { name, expected_end_state, situation: { state: outcome } } ]"></textarea>
                     </div>
                 </div>
                 <div>
@@ -91,6 +92,12 @@
             <div class="editor-container">
                 <div id="opt-report" class="code-display">// 按「執行優化」後，這裡會顯示每一輪的評分與被接受的編輯…</div>
             </div>
+            <details style="margin-top:14px;">
+                <summary class="artifacts-summary" style="font-size:0.92rem;"><i data-lucide="microscope" style="width:15px;"></i> 優化過程（逐輪：缺口 → 候選評分 → 關卡判定）</summary>
+                <div class="editor-container" style="margin-top:10px;">
+                    <div id="opt-trace" class="code-display">// 執行優化後，這裡會逐輪列出缺口、候選評分與關卡判定…</div>
+                </div>
+            </details>
         </section>
 
         <section class="glass-card">

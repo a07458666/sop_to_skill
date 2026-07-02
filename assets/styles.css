@@ -1085,6 +1085,16 @@
         }
         .opt-select:focus, .opt-input:focus { border-color: var(--primary); }
         #opt-scenarios { height: 320px; }
+        .opt-table-summary { color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 8px; }
+        .opt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 18px; }
+        .opt-table th, .opt-table td {
+            text-align: left; padding: 7px 12px;
+            border-bottom: 1px solid var(--border-color); color: var(--text-muted);
+        }
+        .opt-table th { color: var(--text-main); font-weight: 600; font-size: 0.8rem; }
+        .opt-table td code { color: var(--text-main); font-size: 0.8rem; }
+        .opt-ok { color: var(--green); }
+        .opt-fail { color: var(--amber); }
         .artifacts-summary {
             cursor: pointer; font-size: 1.15rem; font-weight: 600; color: var(--text);
             display: flex; align-items: center; gap: 10px; list-style: none;
