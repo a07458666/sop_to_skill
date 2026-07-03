@@ -38,6 +38,8 @@
             <p>用「驗證情境」跑你的 Skill：流程缺漏的分支會被自動找出，提出<b>有界的圖編輯</b>，且只有<b>嚴格提升驗證分數</b>的編輯會被接受——最後轉成 SOP 修訂建議交回給你審核。</p>
         </header>
 
+        <div class="opt-hero" id="opt-hero"></div>
+
         <section class="glass-card">
             <h2 class="section-title"><i data-lucide="flask-conical"></i> 驗證情境與優化設定</h2>
             <p class="intg-hint" id="opt-status">載入中…</p>
@@ -56,6 +58,8 @@
                         <div class="panel-title"><i data-lucide="sliders-horizontal" style="width:16px;"></i> 執行</div>
                     </div>
                     <div class="opt-controls">
+                        <button class="btn-compile" onclick="optAutoDemo()"><i data-lucide="play-circle" style="width:18px;"></i> 一鍵示範：製造缺口 → 自動修復</button>
+                        <div class="opt-divider">或手動操作</div>
                         <label class="opt-label">示範：先移除一條分支，製造 SOP 缺口
                             <select id="opt-drop-select" class="opt-select"></select>
                         </label>

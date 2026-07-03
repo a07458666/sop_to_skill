@@ -1085,6 +1085,24 @@
         }
         .opt-select:focus, .opt-input:focus { border-color: var(--primary); }
         #opt-scenarios { height: 320px; }
+        /* Hero stat tiles (pass rate before → after). Values wear the text token;
+           green/amber appear only on the status border + sub-line. */
+        .opt-hero { display: flex; gap: 14px; align-items: stretch; justify-content: center; margin: 0 0 28px; flex-wrap: wrap; }
+        .opt-hero:empty { display: none; }
+        .opt-tile {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 16px 28px; min-width: 170px; text-align: center;
+        }
+        .opt-tile-label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 4px; }
+        .opt-tile-value { color: var(--text-main); font-size: 3rem; font-weight: 600; line-height: 1.1; }
+        .opt-tile-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 5px; }
+        .opt-tile.ok { border-color: rgba(92, 200, 163, 0.35); }
+        .opt-tile.ok .opt-tile-sub { color: var(--green); }
+        .opt-tile.warn { border-color: rgba(217, 164, 65, 0.4); }
+        .opt-tile.warn .opt-tile-sub { color: var(--amber); }
+        .opt-hero-arrow { display: flex; align-items: center; color: var(--text-muted); font-size: 1.7rem; }
+        .opt-divider { color: var(--text-muted); font-size: 0.78rem; text-align: center; letter-spacing: 1px; }
+
         .opt-table-summary { color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 8px; }
         .opt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 18px; }
         .opt-table th, .opt-table td {

@@ -92,7 +92,9 @@ Output Skill bundle per SOP:
     across all four bundled flows: same accepted edits, rounds, rejected buffer, scores, final
     graph). Validation scenarios are **auto-seeded from the flow** (`seedScenariosFromFlow`,
     one BFS path per end state; user-editable JSON). Demo affordance: 「製造缺口」 drops a chosen
-    transition (`optDropTransition`), then 「執行優化」 (`optRun`) repairs it, shows the report
+    transition (`optDropTransition`) — or 「一鍵示範」 (`optAutoDemo`) picks a scenario-critical
+    branch, drops it and optimizes in one click — then 「執行優化」 (`optRun`) repairs it, updates
+    **hero stat tiles** (pass rate before→after + accepted-edit count; `optRenderHero`), shows the report
     (score before→after, accepted/rejected), a **per-scenario pass/fail table** (before→after,
     live-updating as scenarios are edited; `scenarioResults`/`optRenderScenarioTable`), a
     collapsed **per-round trace** (gaps → top-3 candidate scores → strict-gate verdict;

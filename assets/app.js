@@ -2529,11 +2529,43 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             box.innerHTML = '<div class="opt-table-summary">' + summary + '</div>' + html;
         }
 
+        // Hero stat tiles: pass-rate before → after. Values wear the text token;
+        // only the status sub-line / border carries green (improved) or amber (gaps).
+        function optRenderHero(before, after, editsCount) {
+            const box = document.getElementById('opt-hero');
+            if (!box) return;
+            if (!before) { box.innerHTML = ''; return; }
+            const passed = r => r.filter(x => x.ok).length;
+            const frac = r => passed(r) + '/' + r.length;
+            const full = r => r.length && passed(r) === r.length;
+            const tile = (label, value, cls, sub) =>
+                '<div class="opt-tile' + (cls ? ' ' + cls : '') + '">'
+                + '<div class="opt-tile-label">' + label + '</div>'
+                + '<div class="opt-tile-value">' + value + '</div>'
+                + (sub ? '<div class="opt-tile-sub">' + sub + '</div>' : '')
+                + '</div>';
+            if (!after) {
+                box.innerHTML = tile('目前驗證通過', frac(before), full(before) ? 'ok' : 'warn',
+                    full(before) ? '全部情境可走通' : '有情境走不通（存在缺口）');
+                return;
+            }
+            const gained = passed(after) - passed(before);
+            box.innerHTML =
+                tile('優化前 驗證通過', frac(before), full(before) ? '' : 'warn',
+                    full(before) ? '' : (before.length - passed(before)) + ' 條情境失敗')
+                + '<div class="opt-hero-arrow">→</div>'
+                + tile('優化後 驗證通過', frac(after), full(after) ? 'ok' : 'warn',
+                    gained > 0 ? '+' + gained + ' 條情境修復' : '無變化')
+                + tile('接受的編輯', String(editsCount), '', '通過嚴格改善關卡');
+        }
+
         function optPreviewValidation() {
             if (!optBaselineFlow) return;
             const scenarios = optParseScenarios();
             if (!scenarios) return;
-            optRenderScenarioTable(scenarioResults(optBaselineFlow, scenarios), null);
+            const results = scenarioResults(optBaselineFlow, scenarios);
+            optRenderScenarioTable(results, null);
+            optRenderHero(results, null);
         }
 
         // Render the per-round optimization log (gaps → candidates → strict-gate verdict).
@@ -2625,6 +2657,37 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             optSetStatus('已移除分支 ' + stateId + ' → 「' + outcome + '」（模擬 SOP 缺漏）。下表顯示哪些情境因此失敗；執行優化，看它能否自動找回。');
         }
 
+        // One-click demo: pick a mid-path branch a scenario depends on, drop it,
+        // then immediately optimize — the whole story (break → detect → repair)
+        // lands in the hero tiles, the table, and the per-round trace.
+        function optAutoDemo() {
+            if (!optBaselineFlow) { optSetStatus('請先載入 flow.json（從 ① 編譯，或在下方貼上）。'); return; }
+            const scenarios = optParseScenarios();
+            if (!scenarios) { optSetStatus('驗證情境 JSON 無法解析，無法示範。'); return; }
+            const byId = {};
+            optBaselineFlow.states.forEach(s => { byId[s.id] = s; });
+            // forward-order hops of the first scenario; drop the 2nd hop (or the 1st)
+            const sc = scenarios[0];
+            const hops = [];
+            let cur = optBaselineFlow.start_state;
+            let guard = 0;
+            while (byId[cur] && !_isTerminalState(byId[cur]) && guard < optBaselineFlow.states.length + 3) {
+                guard += 1;
+                const outcome = sc.situation ? sc.situation[cur] : undefined;
+                if (outcome === undefined || !((byId[cur].next_states || {})[outcome])) break;
+                hops.push([cur, outcome]);
+                cur = byId[cur].next_states[outcome];
+            }
+            if (!hops.length) { optSetStatus('第一條情境走不出任何分支，無法示範。'); return; }
+            const [sid, outcome] = hops[Math.min(1, hops.length - 1)];
+            const sel = document.getElementById('opt-drop-select');
+            if (sel) sel.value = sid + '\u0001' + outcome;
+            optDropTransition();
+            optRun();
+            optSetStatus('一鍵示範完成：移除了 ' + sid + ' → 「' + outcome
+                + '」，優化器偵測缺口並自動找回。上方大數字與對照表是修復前後，「優化過程」可展開看逐輪判定。');
+        }
+
         function optRun() {
             if (!optBaselineFlow) { optSetStatus('請先載入 flow.json（從 Converter 編譯，或在下方貼上）。'); return; }
             let scenarios;
@@ -2637,7 +2700,9 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             const beforeResults = scenarioResults(optBaselineFlow, scenarios);
             const result = optimizeFlowJs(optBaselineFlow, scenarios, budget);
             optResultFlow = result.flow;
-            optRenderScenarioTable(beforeResults, scenarioResults(optResultFlow, scenarios));
+            const afterResults = scenarioResults(optResultFlow, scenarios);
+            optRenderScenarioTable(beforeResults, afterResults);
+            optRenderHero(beforeResults, afterResults, result.accepted.length);
             optRenderTrace(result);
 
             let md = '# 優化報告（SkillOpt 式結構化自我演化）\n\n';
