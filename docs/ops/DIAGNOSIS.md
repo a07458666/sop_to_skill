@@ -24,10 +24,15 @@ tree — would have destroyed pushed work.
 - `/tmp` helper scripts you wrote earlier are gone
 
 **Fix (do these, in order):**
-1. `git fetch origin <branch> && git log --oneline -3 origin/<branch>` — compare
-   with local `git log`. If origin is ahead: stash any real local work
-   (`git stash push -m wip <files>`), `git reset --hard origin/<branch>`,
-   `git stash pop`. Never recreate files that origin already has.
+1. `git fetch origin <branch>`, then check BOTH directions before touching anything:
+   `git log origin/<branch>..HEAD` (local-only commits) and
+   `git log HEAD..origin/<branch>` (origin-only commits).
+   - Origin-only commits exist, no local-only ones → stash uncommitted work
+     (`git stash push -m wip`), `git reset --hard origin/<branch>`, pop stash.
+   - LOCAL-ONLY commits exist (diverged) → `git branch rescue-$(date +%s)`
+     FIRST (this preserves them), then reset, then cherry-pick from the rescue
+     branch. `git stash` does NOT protect commits — only a branch does.
+   Never recreate files that origin already has.
 2. Reinstall deps (see the "Environment recovery" block in CLAUDE.md).
 3. Regenerate any /tmp helpers — never assume they survived.
 
@@ -43,12 +48,17 @@ token leak. Second leak: pasting full test logs / reports into the conversation.
 **Fix (hard rules):**
 - Any file > 400 lines: `Grep` for the symbol/section first, then `Read` a
   window of ≤ 120 lines around the hit. Never full-file Read of app.js/styles.css.
-- Test/lint output: always pipe through `| tail -N` (N ≤ 10). You need the
-  verdict, not the transcript.
+- Test/lint output: pipe through `| tail -N` (N ≤ 10) when expecting green —
+  you need the verdict, not the transcript. EXCEPTION when red: re-run ONLY the
+  failing test with full output (`pytest tests/test_x.py::test_y -q`), never
+  debug from a truncated traceback.
 - Questions that span > 5 files ("where is X handled?"): dispatch an Explore
   subagent and receive conclusions + `file:line` only (see docs/ops/DISPATCH.md).
-- Edits do not need read-back — the Edit tool fails loudly on mismatch. Re-read
-  only the exact region when composing a follow-up edit.
+- Read-back boundary (this and DISPATCH §5 / JUDGMENT §5 are one rule):
+  Edit-tool modifications need NO read-back — the tool fails loudly on
+  mismatch. Read-back IS required for newly **Written** deliverable files and
+  for files a subagent claims to have produced (targeted grep/wc, not a full
+  read). Re-read a region only when composing a follow-up edit against it.
 
 ## #3 — The parity/golden discipline breaks silently
 

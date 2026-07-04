@@ -59,7 +59,9 @@ Constraints: prefer primary sources (docs/specs/release notes); note the
 date of each source (things change); if sources conflict, show both sides.
 Acceptance: every factual claim has a source link; explicitly separate
 "verified fact" from "inference"; say "could not verify" where true.
-Report: write the full findings to ⟨docs/research/⟨topic⟩.md⟩; reply with
+Report: write the full findings to a file in the session scratchpad (default
+— research dumps are NOT committed to the repo unless the user asks to keep
+them; if asked, use docs/research/⟨topic⟩.md and create the dir); reply with
 the path + a ≤10-line summary + your recommendation.
 ```
 

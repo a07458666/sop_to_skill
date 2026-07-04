@@ -26,9 +26,10 @@ defines who may change what, how, and when to compress.
 
 ## Backup rule
 
-Before any non-append edit to CLAUDE.md or a docs/ops file: copy the current
-version to `docs/ops/archive/⟨name⟩.⟨YYYY-MM-DD⟩.bak` in the same commit.
-Archive files are never edited.
+Before any non-append edit to CLAUDE.md, any docs/ops file, or
+docs/web_demo.md: copy the current version to
+`docs/ops/archive/⟨name⟩.⟨YYYY-MM-DD⟩.bak` in the same commit (if that name
+already exists today, append `-2`, `-3`, …). Archive files are never edited.
 
 ## LESSON format (append to the END of the file the lesson belongs to)
 
@@ -59,8 +60,8 @@ The docs are stale if any of these disagree with reality — fix docs, not reali
 # every path CLAUDE.md routes to exists
 ls docs/ops/DIAGNOSIS.md docs/ops/DISPATCH.md docs/ops/JUDGMENT.md \
    docs/ops/TEMPLATES.md docs/ops/MAINTENANCE.md docs/ops/LETTER.md docs/web_demo.md
-# the verify block still matches CI
-grep -n "html-validate" .github/workflows/ci-cd.yml CLAUDE.md | head -4
+# the verify block still matches CI (compare the html-validate page lists)
+grep -n "html-validate index" .github/workflows/ci-cd.yml CLAUDE.md
 ```
 
 ## Ownership note

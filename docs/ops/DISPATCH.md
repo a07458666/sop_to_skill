@@ -14,9 +14,10 @@ Claude Code/SDK/API only). `statusline-setup` is irrelevant here.
 **Model override** (Agent tool `model` param): `haiku` | `sonnet` | `opus`
 (| `fable` — Mythos-tier; usually NOT available; if a dispatch with it errors,
 fall back to `opus`). If omitted, the subagent inherits the session model.
-The Agent tool has NO effort parameter; effort exists only on the Workflow
-tool's `agent()` (`low|medium|high|xhigh|max`) — and Workflow may only be used
-when the user explicitly opts in (e.g. says "use a workflow"/"ultracode").
+The Agent tool has NO effort parameter. (A separate `Workflow` orchestration
+tool with per-agent effort levels exists in SOME sessions only — check your
+actual tool list; if absent, the Agent tool is the only dispatch mechanism,
+and even when present Workflow requires the user to explicitly opt in.)
 Default: use the Agent tool.
 
 **Skills that replace hand-rolled dispatch** (invoke via the Skill tool):

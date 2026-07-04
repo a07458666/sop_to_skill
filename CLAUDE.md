@@ -11,10 +11,15 @@ This container is ephemeral and resets silently between turns (deps and local
 commits vanish). Full explanation + symptoms: `docs/ops/DIAGNOSIS.md` #1.
 
 ```bash
-git fetch origin claude/sop-api-mcp-skill-viz-9A1xR 2>/dev/null
-git log --oneline -1; git log --oneline -1 origin/claude/sop-api-mcp-skill-viz-9A1xR
-# If origin is AHEAD of local: stash real local work, then
-#   git reset --hard origin/claude/sop-api-mcp-skill-viz-9A1xR   (then pop stash)
+BR=claude/sop-api-mcp-skill-viz-9A1xR
+git fetch origin $BR 2>/dev/null
+git log --oneline origin/$BR..HEAD   # local-only commits (may be lost work-in-progress)
+git log --oneline HEAD..origin/$BR   # commits origin has that local lacks
+# Both empty            -> in sync, proceed.
+# Only 2nd has commits  -> origin ahead: stash uncommitted work, then
+#                          git reset --hard origin/$BR  (then pop stash)
+# 1st has ANY commits   -> SAFETY FIRST: git branch rescue-$(date +%s) to keep
+#                          them, THEN reset; reconcile by cherry-pick from rescue.
 # NEVER recreate "missing" files before checking origin.
 ```
 
@@ -42,7 +47,8 @@ npm install -g html-validate >/dev/null 2>&1
 6. The `\u0001` separator in `app.js` stays a 6-char escape sequence — never a
    raw control byte (`docs/ops/DIAGNOSIS.md` #3).
 7. Files > 400 lines (`app.js`, `styles.css`): Grep first, Read ≤120-line
-   windows. Pipe test output through `| tail`. (`docs/ops/DIAGNOSIS.md` #2)
+   windows. Pipe green test output through `| tail`; on failure re-run just the
+   failing test with full output. (`docs/ops/DIAGNOSIS.md` #2)
 
 ## Verify before pushing (one copy-paste)
 

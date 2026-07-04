@@ -8,7 +8,10 @@ rubric, see §7 (limits).
 ## §1 When to escalate to a stronger model
 
 Escalate (per docs/ops/DISPATCH.md §4 ladder) when ANY:
-- T1. The same subtask failed twice with different attempted fixes.
+- T1. The same subtask failed twice with different attempted fixes AND a §4-S1
+  re-diagnosis pass did not change your causal model. (Precedence: on the
+  second failure ALWAYS re-diagnose first — S1; escalate only if re-diagnosis
+  leaves you with the same theory of the cause.)
 - T2. The fix keeps GROWING: attempt 2 touches more files than attempt 1.
 - T3. The task needs holding > ~3 interacting constraints at once (e.g. a
   change that must satisfy parity + golden + eval + UI simultaneously).
