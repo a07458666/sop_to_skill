@@ -1,226 +1,132 @@
 # CLAUDE.md
 
-Project memory for the **SOP-to-Skill Compiler**. Read this first; it captures the
-architecture, conventions, and verification workflow so a fresh session is productive
-immediately.
+**SOP-to-Skill Compiler** — compiles human-readable Markdown SOPs (semiconductor
+fab domain, but generic) into enforceable Agent Skill bundles: `SKILL.md` +
+`flow.json` (state machine) + `sop_rule.md` + `sop_quality_report.md`.
+Four-pillar loop: Compile → Enforce → Prove → Evolve (see `docs/PRODUCT.md`).
 
-## What this project is
+## SESSION START — do this before any work
 
-An LLM-powered tool that converts human-readable Markdown SOPs (Standard Operating
-Procedures) into a valid Agent **Skill directory**. It targets a semiconductor
-fab/manufacturing investigation domain, but the compiler is generic.
+This container is ephemeral and resets silently between turns (deps and local
+commits vanish). Full explanation + symptoms: `docs/ops/DIAGNOSIS.md` #1.
 
-Output Skill bundle per SOP:
-- `SKILL.md` — Skill entrypoint (YAML frontmatter + execution instructions).
-- `flow.json` — the state-machine graph (bundled resource).
-- `sop_rule.md` — authoring rules (copied in).
-- `sop_quality_report.md` — quality + API/MCP integration validation findings.
+```bash
+BR=claude/sop-api-mcp-skill-viz-9A1xR
+git fetch origin $BR 2>/dev/null
+git log --oneline origin/$BR..HEAD   # local-only commits (may be lost work-in-progress)
+git log --oneline HEAD..origin/$BR   # commits origin has that local lacks
+# Both empty            -> in sync, proceed.
+# Only 2nd has commits  -> origin ahead: stash uncommitted work, then
+#                          git reset --hard origin/$BR  (then pop stash)
+# 1st has ANY commits   -> SAFETY FIRST: git branch rescue-$(date +%s) to keep
+#                          them, THEN reset; reconcile by cherry-pick from rescue.
+# NEVER recreate "missing" files before checking origin.
+```
 
-## Key files
+Environment recovery (after any reset; safe to re-run):
+```bash
+/usr/local/bin/python3 -m pip install --quiet pydantic pytest
+npm install -g html-validate >/dev/null 2>&1
+```
 
-- `parser.py` — the CLI compiler. Pydantic schema (`State`, `StateMachine`), a
-  Gemini path (`GEMINI_API_KEY`) and an **offline heuristic fallback** parser
-  (`offline_fallback_parse`) used when no key is set. Emits the Skill bundle.
-  `assess_sop_quality()` builds the quality report including the API/MCP validation table.
-- `executor.py` — the **runtime enforcement layer** (M1) + **governance audit** (G4).
-  `SkillExecutor` loads a `flow.json` (reusing the parser's schema) and enforces it as an
-  execution contract: legal-only tool calls + outcomes, human-in-the-loop **approval gates**
-  (explicit `state.requires_approval` wins; null falls back to `DEFAULT_APPROVAL_KEYWORDS`, e.g.
-  hold/escalate/release). G4 audit: every action (`tool_call` / `approval` / `transition`) is
-  recorded with **actor attribution** (`actor` param on the executor + per-call override — e.g.
-  the human who signed off a gate) and a **tamper-evident hash chain** (`prev_hash`/`entry_hash`,
-  sha256; `verify_audit()` recomputes it). Exportable as JSON or CSV (`to_json`/`to_csv`).
-  CLI: `--flow`, `--steps` (`;`-separated outcomes), `--auto-approve`, `--audit`, `--actor`,
-  `--export PATH` (`.csv` → CSV else JSON).
-- `optimizer.py` — **structured self-evolution** of a flow (M2.5), the structured analogue
-  of SkillOpt. Proposes **bounded graph edits** (`Edit`: add_transition / set_signal_field),
-  accepts one **only when it strictly improves a held-out validation score** (`score_flow`
-  via an oracle agent through the executor), with a rejected-edit buffer and edit budget.
-  Candidates come from `detect_gaps` (a validation rollout needing an undefined outcome);
-  the gate uniquely selects the right target because downstream outcomes must also match.
-  CLI: `--flow`, `--scenarios`, `--out`, `--budget`, `--drop` (demo aid to create a gap).
-- `evolve.py` — **evolution closing-the-loop** (G2). Takes the optimizer's accepted graph
-  edits and renders them back as a **SOP-markdown diff** (a reviewable `unified_diff` patch to
-  the source `.md`), so the human-owned SOP stays the single source of truth and recompiles
-  after approval. `apply_edit_to_markdown` maps a state id → its step section via
-  `parser.make_state_id`; `evolve_sop()` runs compile→optimize→render. CLI: `--sop`,
-  `--scenarios`, `--flow-key`, `--drop-branch` (demo), `--apply`.
-- `flowdiff.py` — **structured state-machine diff** (G4 governance primitive). Diffs two
-  `flow.json` versions at the graph level: states added/removed, per-state field changes
-  (tool/params/returns/signal/`requires_approval`/type/description) and transitions
-  added/removed/retargeted. `diff_flows()` → structured dict; `render_markdown()` →
-  reviewable zh-TW report; complements `evolve.py` (markdown diff) with the graph view.
-  Deterministic/offline, reuses the parser schema. CLI: `--old`, `--new`, `--format md|json`,
-  `--check` (exit 1 if the flows differ — CI gate).
-- `mcp_server.py` — **executor as an MCP server** (G1). Wraps `SkillExecutor` and speaks
-  MCP stdio (newline-delimited JSON-RPC 2.0) with no SDK dependency: `initialize`,
-  `tools/list`, `tools/call`, `ping`. Tools: `sop_start`, `sop_current_state`,
-  `sop_report_outcome` (rejects undefined outcomes, returns legal ones), `sop_request_approval`,
-  `sop_call_tool` (gate-checks tool calls), `sop_audit_trail`. The mutating tools accept an
-  optional `actor` (audit attribution) and `sop_audit_trail` returns the hash-chain verdict.
-  `handle()` is pure/unit-tested;
-  `serve_stdio()` is the I/O loop a real agent client spawns. Run: `python mcp_server.py --flow ...`.
-- `eval/` — the eval harness (M1). `run_eval.py` drives a deterministic noisy agent through
-  `scenarios.json` (held-out `dev`/`holdout` split) in two modes (baseline = no enforcement,
-  compiled = executor), proving compiled >> baseline on illegal-action / skipped-step /
-  correct-end rates; writes `eval/results.md`. `--check` gates CI. Methodology aligned with
-  SkillOpt (see `docs/ROADMAP.md`).
-- `tests/` — pytest suite: executor behaviour, the eval invariant, **golden
-  snapshots** (`parser.py` output must match the committed `skills/*` bundles), and
-  **parity** (`assets/app.js` JS compiles SOPs to the same graph as `parser.py`, run
-  under Node — the guardrail against the two implementations drifting).
-- `index.html` (**Converter**) + `simulator.html` (**Simulator**) — the web demo, split into
-  two GitHub Pages. Shared logic lives in `assets/app.js`, shared CSS in `assets/styles.css`
-  (both pages link them; no build step). `app.js` re-implements the compiler in JS
-  (`compileMarkdownToFlow`, `buildSkillMarkdown`, `buildQualityReport`) to stay at **parity
-  with `parser.py`** (enforced by `tests/test_parity.py`, which reads `assets/app.js`).
-  - **Converter**: a two-step journey driven by a top stepper (`showStep`) — ① 編譯 (editor →
-    compile → SKILL.md/flow.json + a collapsed quality report card with a pass/fail badge) and
-    ② 看懂 (the flow visualizer, the hero). Marketing/概念 and the `sop_rule.md` authoring editor
-    are collapsed into `<details>`. 「前往模擬器」(`goToSimulator`) persists state and hands off
-    to step ③; `index.html#review` deep-links straight to step ②.
-  - **Simulator**: loads the compiled flow from `localStorage` (or a pasted `flow.json` via
-    `loadPastedFlow`) → integration config editor + MCP mount panel + execution simulator.
-  - **Governance** (`governance.html`, `data-page="governance"`): the 進階 · 治理 entry — paste
-    two `flow.json` versions (old defaults from `localStorage`) and render a graph-level diff via
-    a **JS port of `flowdiff.py`** (the `// ==== flowdiff` block in `app.js`, kept in parity by
-    `tests/test_flowdiff_parity.py`). It also overlays the diff on the new flow graph
-    (added=green / changed=amber) and renders **evolve suggestions** (`renderEvolveSuggestions`)
-    — the diff translated into reviewable SOP-markdown edits (the web half of `evolve.py`'s
-    close-the-loop; the auto-proposal loop itself stays in Python). Reached via the `.gov-entry`
-    link under the stepper.
-  - Page-aware init: `app.js` reads `document.body.dataset.page` and runs `initConverter()`,
-    `initSimulator()`, or `initGovernance()`. Cross-page handoff via `STORAGE_KEY`
-    (`persistState`/`loadState`).
-- `docs/PRODUCT.md` — product positioning (four-pillar loop: Compile/Enforce/Prove/Evolve,
-  SOP-as-Code, north-star metrics). `docs/ROADMAP.md` — schedule + acceptance criteria;
-  phase 1 (M0–M2.5) done, phase 2 is G1–G4 (G1 = executor as a real MCP server, first).
-- `sample_sop.md` — semiconductor tool fault investigation (English; default for CLI).
-- `examples/` — more SOPs incl. `tool_anomaly_auto_notification_sop.md` (mixed API+MCP).
-- `skills/<name>/` — generated bundles, committed. Regenerate when the parser changes.
-- `sop_rule.md` — SOP authoring rules (incl. the API/MCP annotation rules).
-- `.github/workflows/ci-cd.yml` — CI runs on push to `main` **and on PRs to `main`**:
-  lint (`ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/` + `html-validate index.html simulator.html governance.html` + `node --check assets/app.js`),
-  test (`pytest` incl. golden+parity, needs Node; + `eval/run_eval.py --check`), then
-  GitHub Pages deploy (push-only via `if: github.event_name == 'push'`).
-- `.htmlvalidate.json` — html-validate config (several rules disabled; inline style/script ok).
+## Iron rules (violating any of these breaks the product or the repo)
 
-## Core model
+1. **Parity**: `parser.py` ↔ `app.js` compile path, `flowdiff.py` ↔ its JS
+   block, `optimizer.py` ↔ its JS block are byte-for-byte behavioural twins.
+   Change both sides in the same commit; parity tests enforce it. A parity or
+   golden failure is fixed in the drifted implementation, NEVER in the test or
+   the committed bundle. Python is the source of truth when unsure.
+2. **Golden bundles**: any change to `parser.py` output ⇒ regenerate all four
+   `skills/*` bundles (commands below) in the same commit.
+3. **Push = existence**: push after every commit
+   (`git push -u origin <branch>`; on network failure retry 2s/4s/8s/16s).
+   Unpushed work dies with the container.
+4. UI text zh-TW; code identifiers English. Match the calm visual language
+   (`docs/web_demo.md` §Visual language) — no gradients/glows/feature-dump.
+5. Never put the model identifier in commits, PRs, or code.
+6. The `\u0001` separator in `app.js` stays a 6-char escape sequence — never a
+   raw control byte (`docs/ops/DIAGNOSIS.md` #3).
+7. Files > 400 lines (`app.js`, `styles.css`): Grep first, Read ≤120-line
+   windows. Pipe green test output through `| tail`; on failure re-run just the
+   failing test with full output. (`docs/ops/DIAGNOSIS.md` #2)
 
-A SOP compiles to a state machine. Each `State` has: `id`, `type`
-(`action` | `decision` | `end_state`), `description`, `tool`, `tool_kind`
-(`api` | `mcp` | null), `mcp_server`, `parameters` (input fields), `returns`
-(output fields), `signal_field` (the primary output field the agent reads to route),
-`requires_approval` (`true`/`false`/null — human-in-the-loop approval gate),
-`next_states` (map of free-text outcome → target state id).
-
-### API vs MCP tools (SOP annotation)
-In a `**System/Tool**` line, declare the integration:
-- API: `` `tool_name` (API) (Parameters: `a`, `b`) ``
-- MCP: `` `mcp__jira__create_issue` (MCP) `` or `(MCP: server)`, or just the
-  `mcp__<server>__<tool>` naming convention.
-- Detection: explicit marker > `mcp__` prefix > default `api`. `mcp_server` is the
-  segment between `mcp__` and the next `__`, or the `(MCP: server)` value.
-- Implemented identically in `parser.py:detect_tool_meta` and `assets/app.js:detectToolMeta`.
-
-### Output contract: Returns / Signal (M2)
-A tool step may declare its output contract in the SOP markdown:
-- `**Returns**: \`f1\`, \`f2\`` → `returns` (output field names).
-- `**Signal**: \`f1\`` → `signal_field` (the field the agent inspects to route; should be in `returns`).
-Parsed identically in `parser.py` and `assets/app.js:compileMarkdownToFlow`, written into
-`flow.json`, rendered as a **Response Interpretation** line in `SKILL.md`, and validated
-(non-blocking) in the quality report's integration table (Returns/Signal columns).
-
-### Approval gate (requires_approval)
-A step may be marked a human-in-the-loop **approval gate**: `**Approval**: required`
-(`required`/`yes`/`true`/`需要` → `true`; `no`/`false` → explicit opt-out) → `requires_approval`.
-Parsed identically in `parser.py` and `assets/app.js:compileMarkdownToFlow`, written to
-`flow.json`, rendered as an **Approval Gate** line in `SKILL.md` and an Approval-Gates
-section in the quality report. The executor/MCP server block advancing past an unapproved
-gate; explicit `requires_approval` wins over `DEFAULT_APPROVAL_KEYWORDS` inference (null →
-fall back to keywords). The web simulator enforces it via `approveCurrentState()` (keyed on
-the explicit field only).
-
-### Response interpretation (how the agent routes)
-Each state's `next_states` keys are the agent's **response-interpretation rules**:
-- API: check HTTP `status` (non-2xx ⇒ failure branch), read `body.data`, inspect `signal_field`, match a branch.
-- MCP: check `isError`, read `structuredContent`, inspect `signal_field`, match a branch.
-Surfaced in the node inspector, simulator, and quality report.
-
-## Web demo concepts (assets/app.js, shared by both pages)
-
-- **Tool catalog** (`toolCatalog`): a simulated registry. Each tool advertises a
-  description + input/output schema and returns a realistic, SQL-like result row
-  (e.g. `event_count`, `exposed_lot_count`, `min_cpk`, `root_cause_found`, `issue_key`).
-  `getToolSpec` falls back to a generic schema for unlisted tools.
-  `mockQueryResult(state, outcome)` returns `{ok, data, interpretation}`;
-  `isFailureOutcome(condition)` decides success vs failure data (EN + 中文 keywords).
-- **Integration config editor** (`integrationConfig` + `renderIntegrationEditor`): a
-  user-editable registry of MCP servers/tools and API tools with per-tool I/O fields
-  (`input`/`output` as `name:type`) and a `signal`. **Seeded from `flow.json` on compile**
-  (`seedIntegrationFromFlow`: params→inputs, `returns`→outputs, `signal_field`→signal;
-  rich types pulled from `toolCatalog` when the tool is known). `getToolSpec` consults this
-  config first (`findIntegrationSpec` → `specFromEntry` synthesizes `rows`/`interpret`), so
-  the mount panel, node inspector and simulator all reflect the user's edits after
-  「套用設定」. This is how the user sees/edits exactly how the skill calls API/MCP.
-- **MCP mount panel** (`renderMcpPanel`): mount/unmount the configured servers;
-  advertises each server's tool schemas (from `integrationConfig`). MCP tool calls in the
-  simulator are **blocked until the server is mounted** (`mcpMounts` state).
-- **Execution simulator**: shows request payload, output schema, the verification rule,
-  and per-branch mock responses; the "Investigation Log" records returned data + the
-  agent's interpretation per step.
-- **Flow visualizer** (`computeFlowLayout` + `renderFlowFromGeneratedJson`):
-  layered (Sugiyama-style) layout — longest-path ranking from `start_state`, then
-  median/barycenter sweeps to reduce edge crossings; forward edges curve down with
-  fanned connection points; back/loop edges route along the right margin (amber dashed).
-  Nodes show a colored accent bar, API/MCP badge, transport line, and returned-fields
-  preview. Don't regress this back to the old row-major grid.
-
-## Conventions
-
-- Keep `parser.py` (Python) and `assets/app.js` (JS) **in sync** — they implement the
-  same compile + quality logic; changing one usually means changing the other.
-  `tests/test_parity.py` enforces this for the compile path (structural graph).
-- When `parser.py` output changes, **regenerate the committed skills** (see below).
-- UI text is Traditional Chinese (zh-TW); code identifiers/tools are English.
-- Do not put the model identifier in commits/PRs/code.
-
-## Verify before pushing
+## Verify before pushing (one copy-paste)
 
 ```bash
 ruff check parser.py executor.py optimizer.py evolve.py flowdiff.py mcp_server.py eval/ tests/
 python3 -m pytest tests/ -q
-python3 eval/run_eval.py --check   # compiled must beat baseline; regenerates eval/results.md
-html-validate index.html simulator.html governance.html
-node --check assets/app.js   # shared web-demo JS
-# Regenerate committed skills (offline fallback; no GEMINI_API_KEY needed):
+python3 eval/run_eval.py --check
+html-validate index.html simulator.html governance.html optimize.html
+node --check assets/app.js
+```
+
+Regenerate committed skills (needed only when parser output changes; offline,
+no GEMINI_API_KEY needed):
+```bash
 python3 parser.py --input sample_sop.md --output-dir skills/tool_fault_investigation --rules sop_rule.md
 python3 parser.py --input examples/furnace_temperature_drift_sop.md --output-dir skills/furnace_temperature_drift --rules sop_rule.md
 python3 parser.py --input examples/photoresist_coater_defect_sop.md --output-dir skills/photoresist_coater_defect --rules sop_rule.md
 python3 parser.py --input examples/tool_anomaly_auto_notification_sop.md --output-dir skills/tool_anomaly_auto_notification --rules sop_rule.md
 ```
-There is no browser/puppeteer in the environment. For visual checks of the flow, the
-JS layout/render functions can be extracted and run under Node (computeFlowLayout is
-pure), and a standalone SVG can be rendered to PNG with `cairosvg` (`pip install cairosvg`).
-A lightweight DOM shim can `eval` the inline script to smoke-test the init path.
 
-## Known limitations
+No browser in this environment. UI smoke-testing: extract pure JS functions and
+run under Node, or eval `app.js` inside a DOM shim (pattern: write the shim via
+a `python3` heredoc, stub `document`/`localStorage`, set `body.dataset.page`).
 
-- The web demo runs on static GitHub Pages: MCP mounting and API/MCP calls are a
-  faithful **simulation**, not real network/MCP calls.
-- The JS `makeStateId` strips non-ASCII, so Chinese step titles degrade to `step_N`
-  ids in the web demo. English SOPs via `parser.py` produce semantic ids.
-- The tool catalog covers the tools used by the bundled sample SOPs; others fall back
-  to a generic schema.
+## Key files (one line each; details live in the linked docs)
+
+| File | Role |
+|---|---|
+| `parser.py` | Compiler CLI: Pydantic `State`/`StateMachine`, Gemini path + offline fallback, quality report |
+| `executor.py` | Runtime enforcement (M1) + G4 audit: actor attribution, sha256 hash-chain (`verify_audit`), JSON/CSV export |
+| `optimizer.py` | Structured self-evolution (M2.5): gap detection → bounded edits → strict held-out gate |
+| `evolve.py` | Renders accepted edits back as a reviewable SOP-markdown diff (G2) |
+| `flowdiff.py` | Graph-level diff of two flow.json versions (G4); `--check` = CI gate |
+| `mcp_server.py` | Executor as MCP stdio server (G1); mutating tools take `actor` |
+| `eval/run_eval.py` | Baseline vs compiled eval; `--check` gates CI |
+| `tests/` | Executor, eval invariant, golden snapshots, 3× parity (compile/flowdiff/optimizer) |
+| `assets/app.js` | ALL web-demo logic incl. the three JS ports (~2.7k lines — Grep first) |
+| `index/simulator/optimize/governance.html` | The 4-step journey + governance; map in `docs/web_demo.md` |
+| `.github/workflows/ci-cd.yml` | lint (ruff + html-validate 4 pages + node --check) → test (pytest + eval) → Pages deploy on push to main; also runs on PRs |
+
+## Core model (compressed)
+
+A SOP compiles to a state machine. `State`: `id`, `type`
+(`action`|`decision`|`end_state`), `description`, `tool`, `tool_kind`
+(`api`|`mcp`|null), `mcp_server`, `parameters`, `returns`, `signal_field`
+(the output field the agent routes on), `requires_approval`
+(true/false/null; explicit value wins, null falls back to
+`DEFAULT_APPROVAL_KEYWORDS` inference in the executor), `next_states`
+(free-text outcome → target id).
+
+SOP markdown annotations (parsed identically in `parser.py` and `app.js`):
+- `**System/Tool**`: `` `tool` (API) `` or `` `mcp__server__tool` (MCP) `` or
+  `(MCP: server)`; detection: explicit marker > `mcp__` prefix > default api.
+- `**Returns**: \`f1\`, \`f2\`` → `returns`; `**Signal**: \`f1\`` → `signal_field`.
+- `**Approval**: required|yes|true|需要 → true; no|false → explicit opt-out.
+Authoring rules live in `sop_rule.md`; response-interpretation semantics
+(API status/body vs MCP isError/structuredContent) in `docs/web_demo.md`.
+
+## Route map — read the file that matches your task
+
+| Task | Read |
+|---|---|
+| Anything feels broken / env weird | `docs/ops/DIAGNOSIS.md` |
+| Delegating work / choosing model & effort | `docs/ops/DISPATCH.md` |
+| Deciding: escalate? done? ask user? change course? | `docs/ops/JUDGMENT.md` |
+| Writing a subagent prompt | `docs/ops/TEMPLATES.md` |
+| Updating any docs/ops file | `docs/ops/MAINTENANCE.md` |
+| First session in this repo | `docs/ops/LETTER.md` |
+| Web demo pages/UI work | `docs/web_demo.md` |
+| Product positioning / roadmap status | `docs/PRODUCT.md`, `docs/ROADMAP.md` |
+| UX rationale & history | `docs/UX_REVIEW.md` |
 
 ## Git / workflow
 
-- Designated dev branch: `claude/sop-api-mcp-skill-viz-9A1xR`. Develop there; push with
-  `git push -u origin <branch>`. Only open PRs / merge when asked.
-- GitHub ops go through the GitHub MCP tools (`mcp__github__*`); no `gh` CLI here.
-- Done so far (merged to `main`): API/MCP integration + schema, quality-report
-  integration validation, layered flow layout (crossing fix), MCP mount panel,
-  SQL-like tool-call simulation with agent result interpretation.
-- On dev branch (M1, this work): `executor.py` enforcement layer + `eval/` harness +
-  `tests/`, CI test job, `docs/ROADMAP.md` (incl. SkillOpt positioning). Eval proves
-  illegal-action rate 28%→0% and correct-end 60%→100% (baseline vs compiled).
+- Designated branch: `claude/sop-api-mcp-skill-viz-9A1xR`. Develop there.
+  Open PRs / merge only when asked. After a PR merges, restart the branch:
+  `git fetch origin main && git checkout -B <branch> origin/main`.
+- GitHub ops via `mcp__github__*` tools (load with ToolSearch); no `gh` CLI.
+- Known limitations: web demo is a faithful simulation (no real MCP/network);
+  JS `makeStateId` strips non-ASCII (Chinese titles → `step_N` ids); tool
+  catalog covers bundled SOPs, others get a generic schema.

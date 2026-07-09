@@ -2261,6 +2261,22 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
         }
 
         function initGovernance() {
+            // Hand-off from the optimizer page: prefill both versions and diff immediately.
+            let handoff = null;
+            try { handoff = JSON.parse(localStorage.getItem(STORAGE_KEY + ':gov_handoff') || 'null'); } catch (e) { handoff = null; }
+            if (handoff && handoff.old && handoff.new) {
+                localStorage.removeItem(STORAGE_KEY + ':gov_handoff');
+                const oldBox = document.getElementById('diff-old');
+                const newBox = document.getElementById('diff-new');
+                if (oldBox && newBox) {
+                    oldBox.value = JSON.stringify(handoff.old, null, 2);
+                    newBox.value = JSON.stringify(handoff.new, null, 2);
+                    runFlowDiff();
+                    const status = document.getElementById('diff-status');
+                    if (status) status.textContent = '已載入優化前 / 優化後兩版（來自優化頁），差異如下。';
+                    return;
+                }
+            }
             const had = loadCurrentFlowIntoDiff();
             const status = document.getElementById('diff-status');
             if (status) {
@@ -2270,9 +2286,480 @@ Execute the Standard Operating Procedure (SOP) for: SOP: Semiconductor Tool Faul
             }
         }
 
+        // ==== optimizer (JS port — keep in parity with optimizer.py) ====
+        // Structured self-evolution (M2.5): bounded graph edits, accepted only on a strict
+        // held-out validation improvement. Deterministic — no LLM, no network — so the full
+        // loop runs in the browser. Mirrors optimizer.py exactly; guarded by
+        // tests/test_optimizer_parity.py.
+        function editKey(edit) {
+            return [edit.kind, edit.state_id, edit.outcome || '', edit.target || '', edit.field_value || ''].join('\u0001');
+        }
+
+        function describeEdit(edit) {
+            if (edit.kind === 'add_transition') {
+                return "add_transition(" + edit.state_id + ": '" + edit.outcome + "' -> " + edit.target + ")";
+            }
+            if (edit.kind === 'set_signal_field') {
+                return 'set_signal_field(' + edit.state_id + ' = ' + edit.field_value + ')';
+            }
+            return edit.kind + '(' + edit.state_id + ')';
+        }
+
+        function applyEditToFlow(edit, flow) {
+            const data = JSON.parse(JSON.stringify(flow));
+            data.states.forEach(st => {
+                if (st.id !== edit.state_id) return;
+                if (edit.kind === 'add_transition') {
+                    const ns = st.next_states || {};
+                    ns[edit.outcome] = edit.target;
+                    st.next_states = ns;
+                } else if (edit.kind === 'set_signal_field') {
+                    st.signal_field = edit.field_value;
+                }
+            });
+            return data;
+        }
+
+        function _flowValid(flow) {
+            const ids = new Set((flow.states || []).map(s => s.id));
+            if (!ids.has(flow.start_state)) return false;
+            return (flow.states || []).every(s =>
+                Object.values(s.next_states || {}).every(t => ids.has(t)));
+        }
+
+        function _isTerminalState(state) {
+            return state.type === 'end_state' || !Object.keys(state.next_states || {}).length;
+        }
+
+        function oracleRun(flow, scenario) {
+            // The oracle always picks the scenario's correct outcome; a missing outcome
+            // (adherence gap) fails the run — same contract as optimizer._oracle_run.
+            if (!_flowValid(flow)) return false;
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            let cur = flow.start_state;
+            let guard = 0;
+            while (!_isTerminalState(byId[cur]) && guard < flow.states.length + 3) {
+                guard += 1;
+                const correct = scenario.situation[cur];
+                if (correct === undefined) break;
+                if (!((byId[cur].next_states || {})[correct])) return false;
+                cur = byId[cur].next_states[correct];
+            }
+            return cur === scenario.expected_end_state && _isTerminalState(byId[cur]);
+        }
+
+        function scoreFlowJs(flow, scenarios) {
+            const s = { n: scenarios.length, correct_end: 0, blocked: 0 };
+            scenarios.forEach(sc => { if (oracleRun(flow, sc)) s.correct_end += 1; else s.blocked += 1; });
+            s.scalar = s.correct_end - 0.001 * s.blocked;
+            return s;
+        }
+
+        function detectGapsJs(flow, scenarios) {
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            const gaps = [];
+            const seen = new Set();
+            scenarios.forEach(sc => {
+                if (!_flowValid(flow)) return;
+                let cur = flow.start_state;
+                let guard = 0;
+                while (!_isTerminalState(byId[cur]) && guard < flow.states.length + 3) {
+                    guard += 1;
+                    const correct = sc.situation[cur];
+                    if (correct === undefined) break;
+                    if (!((byId[cur].next_states || {})[correct])) {
+                        const k = cur + '\u0001' + correct;
+                        if (!seen.has(k)) { seen.add(k); gaps.push([cur, correct]); }
+                        break;
+                    }
+                    cur = byId[cur].next_states[correct];
+                }
+            });
+            return gaps;
+        }
+
+        function candidateEditsJs(flow, gaps, rejected) {
+            const stateIds = flow.states.map(s => s.id);
+            const out = [];
+            gaps.forEach(([stateId, outcome]) => {
+                stateIds.forEach(target => {
+                    if (target === stateId) return;
+                    const edit = { kind: 'add_transition', state_id: stateId, outcome, target };
+                    if (!rejected.has(editKey(edit))) out.push(edit);
+                });
+            });
+            return out;
+        }
+
+        function optimizeFlowJs(flow, validation, editBudget, maxRounds) {
+            editBudget = editBudget === undefined ? 5 : editBudget;
+            maxRounds = maxRounds === undefined ? 10 : maxRounds;
+            let current = flow;
+            const rejected = new Set();
+            const result = {
+                flow: current, accepted: [], rejected_count: 0, rounds: 0,
+                start_score: scoreFlowJs(flow, validation).scalar, final_score: 0,
+                trace: []   // per-round transparency for the UI; never affects behaviour
+            };
+            let editsMade = 0;
+            while (editsMade < editBudget && result.rounds < maxRounds) {
+                result.rounds += 1;
+                const base = scoreFlowJs(current, validation);
+                const gaps = detectGapsJs(current, validation);
+                if (!gaps.length) break;
+                const candidates = candidateEditsJs(current, gaps, rejected);
+                if (!candidates.length) break;
+
+                let bestEdit = null;
+                let bestScore = base.scalar;
+                const scored = [];
+                candidates.forEach(edit => {
+                    const candScore = scoreFlowJs(applyEditToFlow(edit, current), validation).scalar;
+                    scored.push([candScore, edit]);
+                    if (candScore > bestScore) { bestScore = candScore; bestEdit = edit; }
+                });
+                result.trace.push({
+                    round: result.rounds,
+                    base: base.scalar,
+                    gaps: gaps.map(g => g[0] + ' → 「' + g[1] + '」'),
+                    n_candidates: candidates.length,
+                    top: scored.slice().sort((a, b) => b[0] - a[0]).slice(0, 3)
+                        .map(([s, e]) => ({ score: s, edit: describeEdit(e) })),
+                    accepted: bestEdit ? describeEdit(bestEdit) : null
+                });
+
+                if (bestEdit === null) {
+                    candidates.forEach(edit => rejected.add(editKey(edit)));
+                    result.rejected_count += candidates.length;
+                    break;
+                }
+                candidates.forEach(edit => { if (editKey(edit) !== editKey(bestEdit)) rejected.add(editKey(edit)); });
+                result.rejected_count += candidates.length - 1;
+                current = applyEditToFlow(bestEdit, current);
+                result.accepted.push({ edit: bestEdit, before: base.scalar, after: bestScore });
+                editsMade += 1;
+            }
+            result.flow = current;
+            result.final_score = scoreFlowJs(current, validation).scalar;
+            return result;
+        }
+        // ==== end optimizer ====
+
+        // Seed a validation set from the flow itself: one scenario per reachable end
+        // state (BFS shortest path), so optimization works for any compiled SOP without
+        // hand-written scenarios. The user can edit/extend the JSON before running.
+        function seedScenariosFromFlow(flow) {
+            const byId = {};
+            flow.states.forEach(s => { byId[s.id] = s; });
+            const parent = {};   // state id -> [prevId, outcome]
+            const queue = [flow.start_state];
+            const visited = new Set([flow.start_state]);
+            while (queue.length) {
+                const cur = queue.shift();
+                Object.entries(byId[cur].next_states || {}).forEach(([outcome, target]) => {
+                    if (visited.has(target)) return;
+                    visited.add(target);
+                    parent[target] = [cur, outcome];
+                    queue.push(target);
+                });
+            }
+            const scenarios = [];
+            flow.states.forEach(state => {
+                if (!_isTerminalState(state) || !visited.has(state.id)) return;
+                const situation = {};
+                let cur = state.id;
+                while (parent[cur]) {
+                    const [prev, outcome] = parent[cur];
+                    situation[prev] = outcome;
+                    cur = prev;
+                }
+                if (state.id !== flow.start_state) {
+                    scenarios.push({
+                        name: 'path to ' + state.id,
+                        expected_end_state: state.id,
+                        situation
+                    });
+                }
+            });
+            return scenarios;
+        }
+
+        // Per-scenario verdicts for the preview/result tables (pure; uses oracleRun).
+        function scenarioResults(flow, scenarios) {
+            return scenarios.map(sc => ({
+                name: sc.name || ('path to ' + sc.expected_end_state),
+                end: sc.expected_end_state,
+                ok: oracleRun(flow, sc)
+            }));
+        }
+
+        // --- optimize page (step ④) -------------------------------------------------
+        let optBaselineFlow = null;   // the flow before optimization (after any demo drop)
+        let optResultFlow = null;     // the optimized flow
+
+        function optParseScenarios() {
+            try {
+                const scenarios = JSON.parse(document.getElementById('opt-scenarios').value);
+                return (Array.isArray(scenarios) && scenarios.length) ? scenarios : null;
+            } catch (e) { return null; }
+        }
+
+        // Render the per-scenario pass/fail table. With `after` (post-optimization
+        // verdicts) it becomes a before → after comparison.
+        function optRenderScenarioTable(before, after) {
+            const box = document.getElementById('opt-scenario-table');
+            if (!box) return;
+            const mark = ok => ok
+                ? '<span class="opt-ok">✓ 通過</span>'
+                : '<span class="opt-fail">✗ 失敗</span>';
+            let html = '<table class="opt-table"><thead><tr><th>驗證情境</th><th>預期終點</th>'
+                + (after ? '<th>優化前</th><th>優化後</th>' : '<th>目前</th>') + '</tr></thead><tbody>';
+            before.forEach((r, i) => {
+                html += '<tr><td>' + escapeHtml(r.name) + '</td><td><code>' + escapeHtml(r.end) + '</code></td>'
+                    + '<td>' + mark(r.ok) + '</td>'
+                    + (after ? '<td>' + mark(after[i].ok) + '</td>' : '') + '</tr>';
+            });
+            html += '</tbody></table>';
+            const passed = before.filter(r => r.ok).length;
+            const summary = after
+                ? '通過 ' + passed + '/' + before.length + ' → ' + after.filter(r => r.ok).length + '/' + after.length
+                : '通過 ' + passed + '/' + before.length;
+            box.innerHTML = '<div class="opt-table-summary">' + summary + '</div>' + html;
+        }
+
+        // Hero stat tiles: pass-rate before → after. Values wear the text token;
+        // only the status sub-line / border carries green (improved) or amber (gaps).
+        function optRenderHero(before, after, editsCount) {
+            const box = document.getElementById('opt-hero');
+            if (!box) return;
+            if (!before) { box.innerHTML = ''; return; }
+            const passed = r => r.filter(x => x.ok).length;
+            const frac = r => passed(r) + '/' + r.length;
+            const full = r => r.length && passed(r) === r.length;
+            const tile = (label, value, cls, sub) =>
+                '<div class="opt-tile' + (cls ? ' ' + cls : '') + '">'
+                + '<div class="opt-tile-label">' + label + '</div>'
+                + '<div class="opt-tile-value">' + value + '</div>'
+                + (sub ? '<div class="opt-tile-sub">' + sub + '</div>' : '')
+                + '</div>';
+            if (!after) {
+                box.innerHTML = tile('目前驗證通過', frac(before), full(before) ? 'ok' : 'warn',
+                    full(before) ? '全部情境可走通' : '有情境走不通（存在缺口）');
+                return;
+            }
+            const gained = passed(after) - passed(before);
+            box.innerHTML =
+                tile('優化前 驗證通過', frac(before), full(before) ? '' : 'warn',
+                    full(before) ? '' : (before.length - passed(before)) + ' 條情境失敗')
+                + '<div class="opt-hero-arrow">→</div>'
+                + tile('優化後 驗證通過', frac(after), full(after) ? 'ok' : 'warn',
+                    gained > 0 ? '+' + gained + ' 條情境修復' : '無變化')
+                + tile('接受的編輯', String(editsCount), '', '通過嚴格改善關卡');
+        }
+
+        function optPreviewValidation() {
+            if (!optBaselineFlow) return;
+            const scenarios = optParseScenarios();
+            if (!scenarios) return;
+            const results = scenarioResults(optBaselineFlow, scenarios);
+            optRenderScenarioTable(results, null);
+            optRenderHero(results, null);
+        }
+
+        // Render the per-round optimization log (gaps → candidates → strict-gate verdict).
+        function optRenderTrace(result) {
+            const box = document.getElementById('opt-trace');
+            if (!box) return;
+            if (!result.trace.length) {
+                box.textContent = '（0 輪：流程已滿足驗證情境，沒有缺口可修。）';
+                return;
+            }
+            const lines = [];
+            result.trace.forEach(t => {
+                lines.push('第 ' + t.round + ' 輪　基準分數 ' + t.base.toFixed(3));
+                t.gaps.forEach(g => lines.push('  缺口：' + g));
+                lines.push('  候選 ' + t.n_candidates + ' 筆（每筆都以驗證情境重新評分），前 ' + t.top.length + ' 名：');
+                t.top.forEach(c => lines.push('    ' + c.score.toFixed(3) + '  ' + c.edit));
+                lines.push(t.accepted
+                    ? '  ✅ 接受：' + t.accepted + '（嚴格改善 → 通過關卡）'
+                    : '  ✗ 本輪無編輯嚴格改善分數：全部駁回並停止。');
+                lines.push('');
+            });
+            box.textContent = lines.join('\n');
+        }
+
+        function optSetStatus(text) {
+            const el = document.getElementById('opt-status');
+            if (el) el.textContent = text;
+        }
+
+        function optRenderFlow(flow, diff) {
+            generatedFiles['flow-json'] = JSON.stringify(flow, null, 2);
+            renderFlowFromGeneratedJson();
+            if (diff) decorateFlowDiff(diff);
+        }
+
+        function optRefreshDropOptions(flow) {
+            const sel = document.getElementById('opt-drop-select');
+            if (!sel) return;
+            sel.innerHTML = '';
+            flow.states.forEach(state => {
+                Object.keys(state.next_states || {}).forEach(outcome => {
+                    const opt = document.createElement('option');
+                    opt.value = state.id + '\u0001' + outcome;
+                    opt.textContent = state.id + ' → 「' + outcome + '」';
+                    sel.appendChild(opt);
+                });
+            });
+        }
+
+        function optLoadFlow(flow, sourceLabel) {
+            optBaselineFlow = JSON.parse(JSON.stringify(flow));
+            optResultFlow = null;
+            const scBox = document.getElementById('opt-scenarios');
+            if (scBox) scBox.value = JSON.stringify(seedScenariosFromFlow(flow), null, 2);
+            optRefreshDropOptions(flow);
+            optRenderFlow(flow, null);
+            const report = document.getElementById('opt-report');
+            if (report) report.textContent = '// 按「執行優化」後，這裡會顯示每一輪的評分與被接受的編輯…';
+            const evolveOut = document.getElementById('opt-evolve');
+            if (evolveOut) evolveOut.textContent = '// 優化後，這裡會列出建議寫回 SOP 的修訂…';
+            const traceBox = document.getElementById('opt-trace');
+            if (traceBox) traceBox.textContent = '// 執行優化後，這裡會逐輪列出缺口、候選評分與關卡判定…';
+            optPreviewValidation();
+            optSetStatus(sourceLabel + '。驗證情境已依流程自動生成（可編輯）。可先「製造缺口」示範，或直接執行優化。');
+        }
+
+        function optLoadPastedFlow() {
+            const box = document.getElementById('opt-flow-paste');
+            if (!box || !box.value.trim()) return;
+            try {
+                optLoadFlow(JSON.parse(box.value.trim()), '已載入貼上的 flow.json');
+            } catch (e) {
+                optSetStatus('無法解析 flow.json：' + e.message);
+            }
+        }
+
+        function optDropTransition() {
+            if (!optBaselineFlow) return;
+            const sel = document.getElementById('opt-drop-select');
+            if (!sel || !sel.value) return;
+            const [stateId, outcome] = sel.value.split('\u0001');
+            optBaselineFlow.states.forEach(st => {
+                if (st.id === stateId && st.next_states) delete st.next_states[outcome];
+            });
+            optResultFlow = null;
+            optRefreshDropOptions(optBaselineFlow);
+            optRenderFlow(optBaselineFlow, null);
+            optPreviewValidation();
+            optSetStatus('已移除分支 ' + stateId + ' → 「' + outcome + '」（模擬 SOP 缺漏）。下表顯示哪些情境因此失敗；執行優化，看它能否自動找回。');
+        }
+
+        // One-click demo: pick a mid-path branch a scenario depends on, drop it,
+        // then immediately optimize — the whole story (break → detect → repair)
+        // lands in the hero tiles, the table, and the per-round trace.
+        function optAutoDemo() {
+            if (!optBaselineFlow) { optSetStatus('請先載入 flow.json（從 ① 編譯，或在下方貼上）。'); return; }
+            const scenarios = optParseScenarios();
+            if (!scenarios) { optSetStatus('驗證情境 JSON 無法解析，無法示範。'); return; }
+            const byId = {};
+            optBaselineFlow.states.forEach(s => { byId[s.id] = s; });
+            // forward-order hops of the first scenario; drop the 2nd hop (or the 1st)
+            const sc = scenarios[0];
+            const hops = [];
+            let cur = optBaselineFlow.start_state;
+            let guard = 0;
+            while (byId[cur] && !_isTerminalState(byId[cur]) && guard < optBaselineFlow.states.length + 3) {
+                guard += 1;
+                const outcome = sc.situation ? sc.situation[cur] : undefined;
+                if (outcome === undefined || !((byId[cur].next_states || {})[outcome])) break;
+                hops.push([cur, outcome]);
+                cur = byId[cur].next_states[outcome];
+            }
+            if (!hops.length) { optSetStatus('第一條情境走不出任何分支，無法示範。'); return; }
+            const [sid, outcome] = hops[Math.min(1, hops.length - 1)];
+            const sel = document.getElementById('opt-drop-select');
+            if (sel) sel.value = sid + '\u0001' + outcome;
+            optDropTransition();
+            optRun();
+            optSetStatus('一鍵示範完成：移除了 ' + sid + ' → 「' + outcome
+                + '」，優化器偵測缺口並自動找回。上方大數字與對照表是修復前後，「優化過程」可展開看逐輪判定。');
+        }
+
+        function optRun() {
+            if (!optBaselineFlow) { optSetStatus('請先載入 flow.json（從 Converter 編譯，或在下方貼上）。'); return; }
+            let scenarios;
+            try {
+                scenarios = JSON.parse(document.getElementById('opt-scenarios').value);
+            } catch (e) { optSetStatus('無法解析驗證情境 JSON：' + e.message); return; }
+            if (!Array.isArray(scenarios) || !scenarios.length) { optSetStatus('驗證情境需為非空陣列。'); return; }
+            const budget = Math.max(1, parseInt(document.getElementById('opt-budget').value, 10) || 5);
+
+            const beforeResults = scenarioResults(optBaselineFlow, scenarios);
+            const result = optimizeFlowJs(optBaselineFlow, scenarios, budget);
+            optResultFlow = result.flow;
+            const afterResults = scenarioResults(optResultFlow, scenarios);
+            optRenderScenarioTable(beforeResults, afterResults);
+            optRenderHero(beforeResults, afterResults, result.accepted.length);
+            optRenderTrace(result);
+
+            let md = '# 優化報告（SkillOpt 式結構化自我演化）\n\n';
+            md += '- 驗證分數（correct-end）：**' + result.start_score.toFixed(3) + ' → ' + result.final_score.toFixed(3) + '**（' + result.rounds + ' 輪）\n';
+            md += '- 接受的編輯：**' + result.accepted.length + '**；駁回（緩衝）：**' + result.rejected_count + '**\n\n';
+            md += '## 被接受的編輯（每一筆都通過「嚴格改善驗證分數」關卡）\n\n';
+            if (result.accepted.length) {
+                result.accepted.forEach(a => {
+                    md += '- `' + describeEdit(a.edit) + '`（驗證 ' + a.before.toFixed(3) + ' → ' + a.after.toFixed(3) + '）\n';
+                });
+            } else {
+                md += '- 無（流程已滿足驗證情境，或沒有任何編輯能嚴格改善分數）。\n';
+            }
+            const report = document.getElementById('opt-report');
+            if (report) report.textContent = md;
+
+            const diff = diffFlows(optBaselineFlow, optResultFlow);
+            optRenderFlow(optResultFlow, diff);
+            const evolveOut = document.getElementById('opt-evolve');
+            if (evolveOut) evolveOut.textContent = renderEvolveSuggestions(diff);
+            optSetStatus(result.accepted.length
+                ? '優化完成：接受 ' + result.accepted.length + ' 筆編輯（圖上琥珀＝變更的 state）。請審核下方 SOP 修訂建議，或送往治理頁比對。'
+                : '優化完成：沒有可接受的編輯。');
+        }
+
+        function optDownloadFlow() {
+            if (!optResultFlow) { optSetStatus('請先執行優化。'); return; }
+            const blob = new Blob([JSON.stringify(optResultFlow, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'flow.optimized.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function optSendToGovernance() {
+            if (!optBaselineFlow || !optResultFlow) { optSetStatus('請先執行優化，再送往治理頁。'); return; }
+            localStorage.setItem(STORAGE_KEY + ':gov_handoff',
+                JSON.stringify({ old: optBaselineFlow, new: optResultFlow }));
+            window.location.href = 'governance.html';
+        }
+
+        function initOptimize() {
+            const saved = loadState();
+            if (saved && saved.files && saved.files['flow-json']) {
+                try {
+                    optLoadFlow(JSON.parse(saved.files['flow-json']), '已載入 Converter 編譯的 flow.json');
+                    return;
+                } catch (e) { /* fall through to the paste prompt */ }
+            }
+            optSetStatus('尚未載入 flow.json。請先在 ① 編譯，或展開下方「貼上 flow.json」。');
+        }
+
         (function initPage() {
             const page = (document.body && document.body.dataset && document.body.dataset.page) || 'converter';
             if (page === 'simulator') initSimulator();
             else if (page === 'governance') initGovernance();
+            else if (page === 'optimize') initOptimize();
             else initConverter();
         })();

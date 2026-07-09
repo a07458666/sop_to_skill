@@ -23,8 +23,12 @@
             </a>
             <span class="step-line"></span>
             <span class="step active">
-                <span class="step-num">3</span><span class="step-text"><b>證明</b><span class="step-sub">模擬 Agent 執行</span></span>
+                <span class="step-num">3</span><span class="step-text"><b>驗證</b><span class="step-sub">模擬 Agent 執行</span></span>
             </span>
+            <span class="step-line"></span>
+            <a class="step" href="optimize.html">
+                <span class="step-num">4</span><span class="step-text"><b>優化</b><span class="step-sub">自動修復 SOP 缺口</span></span>
+            </a>
         </nav>
         <div class="gov-entry"><a href="governance.html"><i data-lucide="git-compare" style="width:13px;vertical-align:-2px;"></i> 進階 · 治理：比較兩版 SOP 狀態機</a></div>
 
@@ -100,6 +104,11 @@
             <div class="sim-controls">
                 <button class="sim-control-btn" id="sim-back-btn" onclick="undoSimulation()"><i data-lucide="undo-2" style="width:16px;"></i> 上一步</button>
                 <button class="sim-control-btn" onclick="resetSimulation()"><i data-lucide="rotate-ccw" style="width:16px;"></i> 重新開始</button>
+            </div>
+        </section>
+        <section class="glass-card">
+            <div class="page-cta">
+                <button class="btn-cta" onclick="window.location.href='optimize.html'"><i data-lucide="sparkles"></i> 下一步：自動優化 Skill &rarr;</button>
             </div>
         </section>
         <footer>
